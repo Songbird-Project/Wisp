@@ -1,14 +1,19 @@
 package include
 
+type Error struct {
+	Info     string
+	ExitCode int
+}
+
 type ASTNode struct {
 	Kind ASTKind
 
 	LHS      *ASTNode
 	RHS      *ASTNode
 	Alt      *ASTNode
-	Children *[]ASTNode
+	Children []*ASTNode
 	Params   []string
-	Name     string
+	Value    string
 }
 
 type ASTKind int
