@@ -58,8 +58,8 @@ const (
 
 	//====== Unary Operators ======//
 	AST_Not    // !LHS
-	AST_Inc    // ++LHS
-	AST_Dec    // --LHS
+	AST_Inc    // LHS++
+	AST_Dec    // LHS--
 	AST_TypeOf // ::LHS
 	AST_BNot   // .!LHS
 
@@ -90,7 +90,7 @@ const (
 	AST_ReturnOnly   // -> LHS RHS
 	AST_ReturnNil    // ~> LHS RHS
 	AST_ReturnErr    // !> LHS RHS
-	AST_ReturnErrNil // -> LHS RHS
+	AST_ReturnErrNil // ?> LHS RHS
 
 	//====== Other ======//
 	AST_Root     // FILE
@@ -98,6 +98,8 @@ const (
 	AST_Block    // {...}
 	AST_Call     // f(x)
 )
+
+var AST_Num = []ASTKind{AST_Int, AST_Float, AST_Hex, AST_Binary}
 
 var astName = map[ASTKind]string{
 	//====== Binary operators ======//
