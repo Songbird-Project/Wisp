@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"unicode"
 )
@@ -31,12 +32,12 @@ func GenerateAST() (ASTNode, *Error) {
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 
-		if len(line) == 0 || line[0:2] == "//" {
+		if len(line) == 0 || len(line) >= 2 && line[0:2] == "//" {
 			lineNum++
 			continue
 		}
 
-		nodes, err := parseLine(line)
+		nodes, err, _ := parseLine(line)
 		if err != nil {
 			return ASTNode{}, err
 		}
@@ -50,58 +51,172 @@ func GenerateAST() (ASTNode, *Error) {
 	return rootNode, nil
 }
 
-func parseLine(line string) ([]*ASTNode, *Error) {
+func parseLine(line string) ([]*ASTNode, *Error, int) {
 	line = strings.TrimSpace(line)
 
 	nodes := []*ASTNode{}
+	var char int
 
-	for char := 0; char < len(line); char++ {
+	for char = 0; char < len(line); char++ {
 		node := &ASTNode{}
 
-		if unicode.IsLetter(rune(line[0])) {
+		// Skip all whitespace
+		for unicode.IsSpace(rune(line[char])) && char < len(line) {
+			char++
+		}
+
+		// Parse identifiers
+		if unicode.IsLetter(rune(line[char])) {
 			node.Kind = AST_Id
 
-			for symbol := 0; symbol < len(line) && !unicode.IsSpace(rune(line[symbol])); symbol++ {
+			for symbol := char; symbol < len(line) && !unicode.IsSpace(rune(line[symbol])); symbol++ {
 				node.Value += string(line[symbol])
 				char++
 			}
-		} else if unicode.IsNumber(rune(line[0])) {
+			// Parse numbers
+		} else if unicode.IsNumber(rune(line[char])) {
 			node.Kind = AST_Int
 
-			for symbol := 0; symbol < len(line) && !unicode.IsSpace(rune(line[symbol])); symbol++ {
+			for symbol := char; symbol < len(line) && !unicode.IsSpace(rune(line[symbol])); symbol++ {
 				node.Value += string(line[symbol])
 
-				if symbol > 0 && line[symbol-1] == '0' {
-					switch line[symbol] {
-					case 'x':
-						node.Kind = AST_Hex
-					case 'b':
-						node.Kind = AST_Binary
-					}
-				} else if unicode.IsLetter(rune(line[symbol])) {
+				if unicode.IsLetter(rune(line[symbol])) {
 					switch node.Kind {
 					case AST_Int:
 						node.Kind = AST_Id
+
+						if symbol > 0 && line[symbol-1] == '0' {
+							switch line[symbol] {
+							case 'x':
+								node.Kind = AST_Hex
+							case 'b':
+								node.Kind = AST_Binary
+							}
+						}
 					case AST_Binary:
 						err := fmt.Sprintf("Invalid symbol found in binary, expected `0` or `1`: `%s`", string(line[symbol]))
-						return nil, &Error{err, 20}
+						return nil, &Error{err, 20}, char
 					case AST_Hex:
 						if !strings.Contains("ABCDEFabcdef", string(line[symbol])) {
 							err := fmt.Sprintf("Invalid symbol found in hexadecimal, expected `0-9`, `a-f` or `A-F`: `%s`", string(line[symbol]))
-							return nil, &Error{err, 20}
+							return nil, &Error{err, 20}, char
 						}
+					case AST_Float:
+						err := fmt.Sprintf("Invalid symbol in identifier: `%s`", string(line[symbol]))
+						return nil, &Error{err, 21}, char
 					}
+				} else if line[symbol] == '.' {
+					node.Kind = AST_Float
+				} else if unicode.IsSymbol(rune(line[symbol])) || strings.Contains("+-*/^%", string(line[symbol])) {
+					char--
+					break
 				}
 
+				if !unicode.IsSymbol(rune(line[symbol])) {
+					char++
+				}
+			}
+			// Parse strings
+		} else if strings.Contains("'\"`", string(line[char])) {
+			node = &ASTNode{
+				Kind: AST_String,
+			}
+
+			// Move over the first quote
+			char++
+
+			for symbol := char; symbol < len(line) && !strings.Contains("'\"`", string(line[char])); symbol++ {
+				node.Value += string(line[symbol])
 				char++
 			}
+
+			if !strings.Contains("'\"`", string(line[char])) {
+				err := "Missing string terminator"
+				return nil, &Error{err, 23}, char
+			}
+		} else if strings.Contains("+-", string(line[char])) {
+			mathNode, newChar, newNodes, err := parseMath(line, char, nodes)
+			if err != nil {
+				return nil, err, char
+			}
+
+			node = mathNode
+			char = newChar
+			nodes = newNodes
 		} else {
 			err := fmt.Sprintf("Invalid symbol: `%s`", string(line[char]))
-			return nil, &Error{err, 21}
+			return nil, &Error{err, 22}, char
 		}
 
 		nodes = append(nodes, node)
 	}
 
-	return nodes, nil
+	return nodes, nil, char
+}
+
+func parseMath(line string, char int, nodes []*ASTNode) (*ASTNode, int, []*ASTNode, *Error) {
+	node := &ASTNode{}
+
+	if nodes == nil || !slices.Contains(append(AST_Num, AST_String), nodes[max(0, len(nodes)-1)].Kind) {
+		err := "Expected number or string as LHS of operator"
+		return nil, char, nodes, &Error{err, 24}
+	}
+
+	node.LHS = nodes[max(0, len(nodes)-1)]
+
+	switch line[char] {
+	case '+':
+		node.Kind = AST_Add
+		char++
+
+		if char < len(line) && line[char] == '+' {
+			node.Kind = AST_Inc
+			if nodes[max(0, len(nodes)-1)].Kind == AST_String {
+				err := "Expected number as LHS of increment"
+				return nil, char, nodes, &Error{err, 24}
+			}
+
+			char++
+		}
+	case '-':
+		node.Kind = AST_Sub
+		char++
+
+		if char < len(line) && line[char] == '-' {
+			node.Kind = AST_Dec
+			if nodes[max(0, len(nodes)-1)].Kind == AST_String {
+				err := "Expected number as LHS of decrement"
+				return nil, char, nodes, &Error{err, 24}
+			}
+
+			char++
+		}
+	}
+
+	if !slices.Contains([]ASTKind{AST_Inc, AST_Dec}, node.Kind) {
+		for unicode.IsSpace(rune(line[char])) && char < len(line) {
+			char++
+		}
+
+		rhsStart := line[char:]
+		rhs, err, charInc := parseLine(rhsStart)
+		if err != nil {
+			return nil, char, nodes, err
+		}
+		char += charInc
+
+		nodes = append(nodes, rhs[0])
+
+		if nodes == nil || !slices.Contains(append(AST_Num, AST_String), nodes[max(0, len(nodes)-1)].Kind) {
+			err := "Expected number or string as RHS of operator"
+			return nil, char, nodes, &Error{err, 25}
+		}
+
+		node.RHS = nodes[max(0, len(nodes)-1)]
+		nodes = nodes[:max(0, len(nodes)-1)]
+	}
+
+	nodes = nodes[:max(0, len(nodes)-1)]
+
+	return node, char, nodes, nil
 }
