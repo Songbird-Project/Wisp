@@ -14,6 +14,7 @@ func main() {
 		os.Exit(err.ExitCode)
 	}
 
+	fmt.Println("\nResult:")
 	for _, node := range astTree.Children {
 		fmt.Printf("Value: %s, Kind: %s\n", node.Value, node.Kind)
 	}
