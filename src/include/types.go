@@ -102,6 +102,8 @@ const (
 )
 
 var AST_Num = []ASTKind{AST_Int, AST_Float, AST_Hex, AST_Binary}
+var AST_Math = []ASTKind{AST_Add, AST_Sub, AST_Mul, AST_Div, AST_Pow, AST_Mod}
+var AST_Bitwise = []ASTKind{AST_BAnd, AST_BOr, AST_BXor, AST_BNot}
 
 var astName = map[ASTKind]string{
 	//====== Binary operators ======//
@@ -136,6 +138,7 @@ var astName = map[ASTKind]string{
 	AST_Variable: "Variable Declaration",
 	AST_Constant: "Constant Declaration",
 	AST_TypeCast: "Type Cast",
+	AST_Assign:   "Variable Assignment",
 
 	//====== Unary Operators ======//
 	AST_Not:    "Not",
