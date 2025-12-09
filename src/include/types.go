@@ -55,6 +55,7 @@ const (
 	AST_Variable // LHS := RHS
 	AST_Constant // LHS #= RHS
 	AST_TypeCast // LHS :: RHS
+	AST_Assign   // LHS = RHS
 
 	//====== Unary Operators ======//
 	AST_Not    // !LHS
@@ -73,20 +74,21 @@ const (
 	AST_Id     // name
 	AST_ListId // [...]Id
 
+	//====== Conditionals ======//
+	AST_If    // if LHS RHS ALT
+	AST_Else  // else LHS
+	AST_While // while LHS RHS
+	AST_For   // for LHS RHS
+
 	//====== Keywords ======//
 	AST_Return   // return LHS
 	AST_Exit     // exit
 	AST_ExitCode // exit <- LHS
 	AST_ExitNow  // exit <! LHS
-	AST_If       // if LHS RHS ALT
-	AST_Else     // else LHS
-	AST_While    // while LHS RHS
-	AST_For      // for LHS RHS
-	AST_True     // true
-	AST_False    // false
+	AST_Bool     // true | false
 	AST_Nil      // nil
 
-	//====== Return ======//
+	//====== Returns ======//
 	AST_ReturnOnly   // -> LHS RHS
 	AST_ReturnNil    // ~> LHS RHS
 	AST_ReturnErr    // !> LHS RHS
@@ -152,20 +154,21 @@ var astName = map[ASTKind]string{
 	AST_Id:     "Identifier",
 	AST_ListId: "List-type Identifier",
 
+	//====== Conditionals ======//
+	AST_If:    "If Statement",
+	AST_Else:  "Else Statement",
+	AST_While: "While Statement",
+	AST_For:   "For Statement",
+
 	//====== Keywords ======//
 	AST_Return:   "Return",
 	AST_Exit:     "Exit",
 	AST_ExitCode: "Exit Code",
 	AST_ExitNow:  "Exit Now",
-	AST_If:       "If Statement",
-	AST_Else:     "Else Statement",
-	AST_While:    "While Statement",
-	AST_For:      "For Statement",
-	AST_True:     "True",
-	AST_False:    "False",
+	AST_Bool:     "Boolean",
 	AST_Nil:      "Nil",
 
-	//====== Return ======//
+	//====== Returns ======//
 	AST_ReturnOnly:   "Return Only",
 	AST_ReturnNil:    "Return Nil",
 	AST_ReturnErr:    "Return Error",
@@ -194,7 +197,9 @@ func (astType ASTKind) Class() string {
 		return "Equality"
 	case AST_Variable, AST_Constant, AST_TypeCast, AST_Function:
 		return "Assignment"
-	case AST_Return, AST_Exit, AST_ExitCode, AST_ExitNow, AST_True, AST_False, AST_Nil:
+	case AST_If, AST_Else, AST_For, AST_While:
+		return "Conditional"
+	case AST_Return, AST_Exit, AST_ExitCode, AST_ExitNow, AST_Bool, AST_Nil:
 		return "Keyword"
 	case AST_ReturnOnly, AST_ReturnNil, AST_ReturnErr, AST_ReturnErrNil:
 		return "Return"
