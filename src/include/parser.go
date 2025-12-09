@@ -102,11 +102,19 @@ func parseLine(line string) ([]*ASTNode, *Error, int) {
 							return nil, &Error{err, 20}, char
 						}
 					case AST_Float:
-						err := fmt.Sprintf("Invalid symbol in identifier: `%s`", string(line[symbol]))
+						err := fmt.Sprintf("Invalid symbol in float, expected `0-9`: `%s`", string(line[symbol]))
 						return nil, &Error{err, 21}, char
 					}
 				} else if line[symbol] == '.' {
-					node.Kind = AST_Float
+					if char < len(line) && unicode.IsSymbol(rune(line[char+1])) {
+						char--
+						break
+					} else if node.Kind == AST_Float {
+						err := fmt.Sprintf("Invalid symbol in float, expected `0-9`: `%s`", string(line[symbol]))
+						return nil, &Error{err, 21}, char
+					} else {
+						node.Kind = AST_Float
+					}
 				} else if unicode.IsSymbol(rune(line[symbol])) || strings.Contains("+-*/^%", string(line[symbol])) {
 					char--
 					break
@@ -134,13 +142,22 @@ func parseLine(line string) ([]*ASTNode, *Error, int) {
 				err := "Missing string terminator"
 				return nil, &Error{err, 23}, char
 			}
-		} else if strings.Contains("+-", string(line[char])) {
-			mathNode, newChar, newNodes, err := parseMath(line, char, nodes)
+		} else if strings.Contains("+-*/%^.", string(line[char])) {
+			opNode, newChar, newNodes, err := parseOp(line, char, nodes)
 			if err != nil {
 				return nil, err, char
 			}
 
-			node = mathNode
+			node = opNode
+			char = newChar
+			nodes = newNodes
+		} else if strings.Contains("=<>", string(line[char])) {
+			eqNode, newChar, newNodes, err := parseEq(line, char, nodes)
+			if err != nil {
+				return nil, err, char
+			}
+
+			node = eqNode
 			char = newChar
 			nodes = newNodes
 		} else {
@@ -154,10 +171,10 @@ func parseLine(line string) ([]*ASTNode, *Error, int) {
 	return nodes, nil, char
 }
 
-func parseMath(line string, char int, nodes []*ASTNode) (*ASTNode, int, []*ASTNode, *Error) {
+func parseOp(line string, char int, nodes []*ASTNode) (*ASTNode, int, []*ASTNode, *Error) {
 	node := &ASTNode{}
 
-	if nodes == nil || !slices.Contains(append(AST_Num, AST_String), nodes[max(0, len(nodes)-1)].Kind) {
+	if nodes == nil || !slices.Contains(append(AST_Num, AST_String, AST_Id), nodes[max(0, len(nodes)-1)].Kind) {
 		err := "Expected number or string as LHS of operator"
 		return nil, char, nodes, &Error{err, 24}
 	}
@@ -165,6 +182,7 @@ func parseMath(line string, char int, nodes []*ASTNode) (*ASTNode, int, []*ASTNo
 	node.LHS = nodes[max(0, len(nodes)-1)]
 
 	switch line[char] {
+	//====== Math ======//
 	case '+':
 		node.Kind = AST_Add
 		char++
@@ -191,6 +209,45 @@ func parseMath(line string, char int, nodes []*ASTNode) (*ASTNode, int, []*ASTNo
 
 			char++
 		}
+	case '*':
+		node.Kind = AST_Mul
+		char++
+	case '/':
+		node.Kind = AST_Mul
+		char++
+	case '%':
+		node.Kind = AST_Mul
+		char++
+	case '^':
+		node.Kind = AST_Mul
+		char++
+
+	//====== Bitwise ======//
+	case '.':
+		char++
+
+		switch line[char] {
+		case '&':
+			node.Kind = AST_BAnd
+		case '|':
+			node.Kind = AST_BOr
+		case '^':
+			node.Kind = AST_BXor
+		case '<':
+			node.Kind = AST_BLeft
+		case '>':
+			node.Kind = AST_BRight
+		default:
+			err := fmt.Sprintf("Invalid operator: `%s`", string(line[char-1:char+1]))
+			return nil, char, nodes, &Error{err, 25}
+		}
+
+		char++
+	}
+
+	if char >= len(line) && !slices.Contains([]ASTKind{AST_Inc, AST_Dec}, node.Kind) {
+		err := "Expected expression after operator"
+		return nil, char, nodes, &Error{err, 26}
 	}
 
 	if !slices.Contains([]ASTKind{AST_Inc, AST_Dec}, node.Kind) {
@@ -207,9 +264,9 @@ func parseMath(line string, char int, nodes []*ASTNode) (*ASTNode, int, []*ASTNo
 
 		nodes = append(nodes, rhs[0])
 
-		if nodes == nil || !slices.Contains(append(AST_Num, AST_String), nodes[max(0, len(nodes)-1)].Kind) {
+		if nodes == nil || !slices.Contains(append(AST_Num, AST_String, AST_Id), nodes[max(0, len(nodes)-1)].Kind) {
 			err := "Expected number or string as RHS of operator"
-			return nil, char, nodes, &Error{err, 25}
+			return nil, char, nodes, &Error{err, 26}
 		}
 
 		node.RHS = nodes[max(0, len(nodes)-1)]
@@ -217,6 +274,70 @@ func parseMath(line string, char int, nodes []*ASTNode) (*ASTNode, int, []*ASTNo
 	}
 
 	nodes = nodes[:max(0, len(nodes)-1)]
+
+	return node, char, nodes, nil
+}
+
+func parseEq(line string, char int, nodes []*ASTNode) (*ASTNode, int, []*ASTNode, *Error) {
+	node := &ASTNode{}
+
+	if nodes == nil ||
+		!slices.Contains(append(AST_Num, AST_String, AST_Id, AST_Bool), nodes[max(0, len(nodes)-1)].Kind) {
+		err := "Expected number, string, identifier or boolean as LHS of operator"
+		return nil, char, nodes, &Error{err, 24}
+	}
+
+	switch line[char] {
+	case '=':
+		node.Kind = AST_Assign
+		fmt.Println(line, line[char])
+		char++
+	case '>':
+		node.Kind = AST_Greater
+		char++
+	case '<':
+		node.Kind = AST_Lesser
+		char++
+	}
+
+	if char < len(line) && line[char] == '=' {
+		switch line[char-1] {
+		case '=':
+			node.Kind = AST_Equal
+		case '>':
+			node.Kind = AST_GreaterOrEqual
+		case '<':
+			node.Kind = AST_LesserOrEqual
+		}
+
+		char++
+	}
+
+	if char >= len(line) {
+		err := "Expected expression after equality"
+		return nil, char, nodes, &Error{err, 26}
+	}
+
+	for unicode.IsSpace(rune(line[char])) && char < len(line) {
+		char++
+	}
+
+	rhsStart := line[char:]
+	rhs, err, charInc := parseLine(rhsStart)
+	if err != nil {
+		return nil, char, nodes, err
+	}
+	char += charInc
+
+	nodes = append(nodes, rhs[0])
+
+	if nodes == nil || !slices.Contains(append(AST_Num, AST_String, AST_Id, AST_Bool), nodes[max(0, len(nodes)-1)].Kind) {
+		err := "Expected number or string as RHS of operator"
+		return nil, char, nodes, &Error{err, 26}
+	}
+
+	node.RHS = nodes[max(0, len(nodes)-1)]
+	nodes = nodes[:max(0, len(nodes)-2)]
 
 	return node, char, nodes, nil
 }
