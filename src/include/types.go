@@ -1,5 +1,15 @@
 package include
 
+import "bufio"
+
+type Parser struct {
+	LineNum int
+	LineCol int
+	Context ASTKind
+
+	Scanner bufio.Scanner
+}
+
 type Error struct {
 	Info     string
 	ExitCode int
@@ -85,7 +95,8 @@ const (
 	AST_Exit     // exit
 	AST_ExitCode // exit <- LHS
 	AST_ExitNow  // exit <! LHS
-	AST_Bool     // true | false
+	AST_True     // true
+	AST_False    // false
 	AST_Nil      // nil
 
 	//====== Returns ======//
@@ -104,6 +115,7 @@ const (
 var AST_Num = []ASTKind{AST_Int, AST_Float, AST_Hex, AST_Binary}
 var AST_Math = []ASTKind{AST_Add, AST_Sub, AST_Mul, AST_Div, AST_Pow, AST_Mod}
 var AST_Bitwise = []ASTKind{AST_BAnd, AST_BOr, AST_BXor, AST_BNot}
+var AST_Bool = []ASTKind{AST_True, AST_False}
 
 var astName = map[ASTKind]string{
 	//====== Binary operators ======//
@@ -168,7 +180,8 @@ var astName = map[ASTKind]string{
 	AST_Exit:     "Exit",
 	AST_ExitCode: "Exit Code",
 	AST_ExitNow:  "Exit Now",
-	AST_Bool:     "Boolean",
+	AST_True:     "True",
+	AST_False:    "False",
 	AST_Nil:      "Nil",
 
 	//====== Returns ======//
@@ -202,7 +215,7 @@ func (astType ASTKind) Class() string {
 		return "Assignment"
 	case AST_If, AST_Else, AST_For, AST_While:
 		return "Conditional"
-	case AST_Return, AST_Exit, AST_ExitCode, AST_ExitNow, AST_Bool, AST_Nil:
+	case AST_Return, AST_Exit, AST_ExitCode, AST_ExitNow, AST_Nil, AST_True, AST_False:
 		return "Keyword"
 	case AST_ReturnOnly, AST_ReturnNil, AST_ReturnErr, AST_ReturnErrNil:
 		return "Return"
