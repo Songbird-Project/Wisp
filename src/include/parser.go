@@ -28,16 +28,19 @@ func GenerateAST() (ASTNode, *Error) {
 	tree := []*ASTNode{}
 
 	lineNum := 1
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
+	p := &Parser{
+		Scanner: *bufio.NewScanner(file),
+	}
+
+	for p.Scanner.Scan() {
+		line := strings.TrimSpace(p.Scanner.Text())
 
 		if len(line) == 0 || len(line) >= 2 && line[0:2] == "//" {
 			lineNum++
 			continue
 		}
 
-		nodes, err, _ := parseLine(line, -1)
+		nodes, err, _ := p.parse(-1, nil)
 		if err != nil {
 			return ASTNode{}, err
 		}
@@ -51,8 +54,14 @@ func GenerateAST() (ASTNode, *Error) {
 	return rootNode, nil
 }
 
-func parseLine(line string, exprs int) ([]*ASTNode, *Error, int) {
-	line = strings.TrimSpace(line)
+func (p *Parser) parse(exprs int, toParse *string) ([]*ASTNode, *Error, int) {
+	var line string
+
+	if toParse != nil {
+		line = *toParse
+	} else {
+		line = strings.TrimSpace(p.Scanner.Text())
+	}
 
 	nodes := []*ASTNode{}
 	var char int
@@ -80,6 +89,35 @@ func parseLine(line string, exprs int) ([]*ASTNode, *Error, int) {
 			for symbol := char; symbol < len(line) && unicode.IsLetter(rune(line[symbol])); symbol++ {
 				node.Value += string(line[symbol])
 				char++
+			}
+
+			switch node.Value {
+			case "fn":
+				if p.Context == AST_Function {
+					err := "Expected function name after `fn` keyword"
+					return nil, &Error{err, 63}, char
+				}
+
+				fnNode, newChar, err := p.parseFn(line, char)
+				if err != nil {
+					return nil, err, char
+				}
+
+				node = fnNode
+				char = newChar
+			case "return":
+			// TODO: `parseReturn` method
+			case "exit":
+			// TODO: `parseExit` method
+			case "true":
+				node.Kind = AST_True
+				node.Value = ""
+			case "false":
+				node.Kind = AST_False
+				node.Value = ""
+			case "nil":
+				node.Kind = AST_Nil
+				node.Value = ""
 			}
 
 			char--
@@ -155,7 +193,7 @@ func parseLine(line string, exprs int) ([]*ASTNode, *Error, int) {
 				return nil, &Error{err, 23}, char
 			}
 		} else if strings.Contains("+-*/%^.", string(line[char])) {
-			opNode, newChar, newNodes, err := parseOp(line, char, nodes)
+			opNode, newChar, newNodes, err := p.parseOp(line, char, nodes)
 			if err != nil {
 				return nil, err, char
 			}
@@ -164,7 +202,7 @@ func parseLine(line string, exprs int) ([]*ASTNode, *Error, int) {
 			char = newChar
 			nodes = newNodes
 		} else if strings.Contains("=<>", string(line[char])) {
-			eqNode, newChar, newNodes, err := parseEq(line, char, nodes)
+			eqNode, newChar, newNodes, err := p.parseEq(line, char, nodes)
 			if err != nil {
 				return nil, err, char
 			}
@@ -173,7 +211,7 @@ func parseLine(line string, exprs int) ([]*ASTNode, *Error, int) {
 			char = newChar
 			nodes = newNodes
 		} else if line[char] == '!' {
-			notNode, newChar, newNodes, err := parseNot(line, char, nodes)
+			notNode, newChar, newNodes, err := p.parseNot(line, char, nodes)
 			if err != nil {
 				return nil, err, char
 			}
@@ -182,7 +220,7 @@ func parseLine(line string, exprs int) ([]*ASTNode, *Error, int) {
 			char = newChar
 			nodes = newNodes
 		} else if line[char] == ':' {
-			opNode, newChar, newNodes, err := parseTypeOp(line, char, nodes)
+			opNode, newChar, newNodes, err := p.parseTypeOp(line, char, nodes)
 			if err != nil {
 				return nil, err, char
 			}
@@ -190,6 +228,16 @@ func parseLine(line string, exprs int) ([]*ASTNode, *Error, int) {
 			node = opNode
 			char = newChar
 			nodes = newNodes
+		} else if line[char] == '{' {
+			blockNode, newChar, err := p.parseBlock(line, char)
+			if err != nil {
+				return nil, err, char
+			}
+
+			node = blockNode
+			char = newChar
+		} else if p.Context == AST_Block && line[char] == '}' {
+			return nil, nil, char
 		} else {
 			err := fmt.Sprintf("Invalid symbol: `%s`", string(line[char]))
 			return nil, &Error{err, 22}, char
@@ -206,7 +254,7 @@ func parseLine(line string, exprs int) ([]*ASTNode, *Error, int) {
 	return nodes, nil, char
 }
 
-func parseOp(line string, char int, nodes []*ASTNode) (*ASTNode, int, []*ASTNode, *Error) {
+func (p *Parser) parseOp(line string, char int, nodes []*ASTNode) (*ASTNode, int, []*ASTNode, *Error) {
 	node := &ASTNode{}
 
 	if len(nodes) == 0 || nodes == nil ||
@@ -224,7 +272,6 @@ func parseOp(line string, char int, nodes []*ASTNode) (*ASTNode, int, []*ASTNode
 		char++
 
 		if char < len(line) && line[char] == '+' {
-			fmt.Println("Increment")
 			node.Kind = AST_Inc
 			if nodes[max(0, len(nodes)-1)].Kind == AST_String {
 				err := "Expected number as LHS of increment"
@@ -294,7 +341,7 @@ func parseOp(line string, char int, nodes []*ASTNode) (*ASTNode, int, []*ASTNode
 		}
 
 		rhsStart := line[char:]
-		rhs, err, charInc := parseLine(rhsStart, 1)
+		rhs, err, charInc := p.parse(1, &rhsStart)
 		if err != nil {
 			return nil, char, nodes, err
 		}
@@ -316,11 +363,12 @@ func parseOp(line string, char int, nodes []*ASTNode) (*ASTNode, int, []*ASTNode
 	return node, char - 1, nodes, nil
 }
 
-func parseEq(line string, char int, nodes []*ASTNode) (*ASTNode, int, []*ASTNode, *Error) {
+func (p *Parser) parseEq(line string, char int, nodes []*ASTNode) (*ASTNode, int, []*ASTNode, *Error) {
 	node := &ASTNode{}
 
 	if len(nodes) == 0 || nodes == nil ||
-		!slices.Contains(append(AST_Num, AST_String, AST_Id, AST_Bool, AST_TypeOf, AST_TypeCast), nodes[max(0, len(nodes)-1)].Kind) {
+		!slices.Contains(append(append(AST_Num, AST_String, AST_Id, AST_TypeOf, AST_TypeCast), AST_Bool...),
+			nodes[max(0, len(nodes)-1)].Kind) {
 		err := "Expected typeOf, type cast, bool, ientifier, number, string, identifier or boolean as LHS of equality"
 		return nil, char, nodes, &Error{err, 24}
 	}
@@ -363,7 +411,7 @@ func parseEq(line string, char int, nodes []*ASTNode) (*ASTNode, int, []*ASTNode
 	}
 
 	rhsStart := line[char:]
-	rhs, err, charInc := parseLine(rhsStart, 1)
+	rhs, err, charInc := p.parse(1, &rhsStart)
 	if err != nil {
 		return nil, char, nodes, err
 	}
@@ -371,7 +419,9 @@ func parseEq(line string, char int, nodes []*ASTNode) (*ASTNode, int, []*ASTNode
 
 	nodes = append(nodes, rhs[0])
 
-	if len(nodes) == 0 || nodes == nil || !slices.Contains(append(AST_Num, AST_String, AST_Id, AST_Bool, AST_TypeOf, AST_TypeCast), nodes[max(0, len(nodes)-1)].Kind) {
+	if len(nodes) == 0 || nodes == nil ||
+		!slices.Contains(append(append(AST_Num, AST_String, AST_Id, AST_TypeOf, AST_TypeCast), AST_Bool...),
+			nodes[max(0, len(nodes)-1)].Kind) {
 		err := "Expected typeOf, type cast, bool, identifier, number or string as RHS of equality"
 		return nil, char, nodes, &Error{err, 26}
 	}
@@ -382,7 +432,7 @@ func parseEq(line string, char int, nodes []*ASTNode) (*ASTNode, int, []*ASTNode
 	return node, char, nodes, nil
 }
 
-func parseNot(line string, char int, nodes []*ASTNode) (*ASTNode, int, []*ASTNode, *Error) {
+func (p *Parser) parseNot(line string, char int, nodes []*ASTNode) (*ASTNode, int, []*ASTNode, *Error) {
 	node := &ASTNode{}
 
 	node.Kind = AST_Not
@@ -395,7 +445,7 @@ func parseNot(line string, char int, nodes []*ASTNode) (*ASTNode, int, []*ASTNod
 	}
 
 	if node.Kind == AST_NotEqual {
-		if !slices.Contains(append(AST_Num, AST_String, AST_Id, AST_Bool), nodes[max(0, len(nodes)-1)].Kind) {
+		if !slices.Contains(append(append(AST_Num, AST_String, AST_Id), AST_Bool...), nodes[max(0, len(nodes)-1)].Kind) {
 			err := "Expected bool, identifier, number or string as LHS of equality"
 			return nil, char, nodes, &Error{err, 24}
 		}
@@ -414,7 +464,7 @@ func parseNot(line string, char int, nodes []*ASTNode) (*ASTNode, int, []*ASTNod
 	}
 
 	rhsStart := line[char:]
-	rhs, err, charInc := parseLine(rhsStart, 1)
+	rhs, err, charInc := p.parse(1, &rhsStart)
 	if err != nil {
 		return nil, char, nodes, err
 	}
@@ -425,11 +475,11 @@ func parseNot(line string, char int, nodes []*ASTNode) (*ASTNode, int, []*ASTNod
 	if nodes == nil {
 		err := "Expected expression"
 		return nil, char, nodes, &Error{err, 26}
-	} else if !slices.Contains(append(AST_Num, AST_String, AST_Id, AST_Bool), nodes[max(0, len(nodes)-1)].Kind) &&
+	} else if !slices.Contains(append(append(AST_Num, AST_String, AST_Id), AST_Bool...), nodes[max(0, len(nodes)-1)].Kind) &&
 		node.Kind == AST_NotEqual {
 		err := "Expected bool, identifier, number or string as RHS of equality"
 		return nil, char, nodes, &Error{err, 24}
-	} else if nodes[max(0, len(nodes)-1)].Kind != AST_Bool && node.Kind == AST_Not {
+	} else if slices.Contains(AST_Bool, nodes[max(0, len(nodes)-1)].Kind) && node.Kind == AST_Not {
 		err := "Expected bool as RHS of `not`"
 		return nil, char, nodes, &Error{err, 24}
 	}
@@ -440,7 +490,7 @@ func parseNot(line string, char int, nodes []*ASTNode) (*ASTNode, int, []*ASTNod
 	return node, char, nodes, nil
 }
 
-func parseTypeOp(line string, char int, nodes []*ASTNode) (*ASTNode, int, []*ASTNode, *Error) {
+func (p *Parser) parseTypeOp(line string, char int, nodes []*ASTNode) (*ASTNode, int, []*ASTNode, *Error) {
 	node := &ASTNode{}
 
 	if nodes != nil && nodes[max(0, len(nodes)-1)].Kind != AST_Id {
@@ -467,7 +517,7 @@ func parseTypeOp(line string, char int, nodes []*ASTNode) (*ASTNode, int, []*AST
 
 	if char < len(line) {
 		rhsStart := line[char:]
-		rhs, err, charInc := parseLine(rhsStart, 1)
+		rhs, err, charInc := p.parse(1, &rhsStart)
 		if err != nil {
 			return nil, char, nodes, err
 		}
@@ -497,4 +547,74 @@ func parseTypeOp(line string, char int, nodes []*ASTNode) (*ASTNode, int, []*AST
 	}
 
 	return node, char, nodes, nil
+}
+
+func (p *Parser) parseBlock(line string, char int) (*ASTNode, int, *Error) {
+	node := &ASTNode{}
+	node.Kind = AST_Block
+	node.Children = []*ASTNode{}
+
+	char++
+
+	p.Context = AST_Block
+
+	for p.Scanner.Scan() {
+		line = p.Scanner.Text()
+		char = 0
+
+		nodes, err, newChar := p.parse(-1, &line)
+		if err != nil {
+			return nil, char, err
+		}
+
+		char = newChar
+
+		if len(line) > 0 && char < len(line) && line[char] != '}' {
+			break
+		}
+
+		node.Children = append(node.Children, nodes...)
+	}
+
+	p.Context = AST_Nil
+	char++
+
+	return node, char, nil
+}
+
+func (p *Parser) parseFn(line string, char int) (*ASTNode, int, *Error) {
+	p.Context = AST_Function
+
+	node := &ASTNode{}
+	node.Kind = AST_Function
+
+	loc := line[char:]
+	name, err, newChar := p.parse(1, &loc)
+	if err != nil {
+		return nil, char, err
+	}
+
+	if len(name) == 0 || name[0].Kind != AST_Id {
+		err := "Expected identifier for function name"
+		return nil, char, &Error{err, 27}
+	}
+
+	node.Value = name[0].Value
+	char = newChar
+
+	for char < len(line) && unicode.IsSpace(rune(line[char])) {
+		char++
+	}
+
+	block, newChar, err := p.parseBlock(line, char)
+	if err != nil {
+		return nil, char, err
+	}
+
+	node.Children = block.Children
+	char = newChar
+
+	p.Context = AST_Nil
+
+	return node, char, nil
 }
