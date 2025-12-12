@@ -77,3 +77,49 @@ pub const astType = enum {
     Block, // {...}
     Call, // f(x)
 };
+
+pub const Token = struct {
+    kind: TokKind = TokKind.EOF,
+    value: []u8 = "",
+};
+
+pub const TokKind = enum {
+    //====== Symbols ======//
+    Plus, // +
+    Dash, // -
+    FSlash, // /
+    Star, // *
+    Percent, // %
+    Caret, // ^
+    Pipe, // |
+    And, // &
+    Equals, // =
+    Dollar, // $
+    Underscore, // _
+    BSlash, // \
+    Comma, // ,
+    Period, // .
+    Question, // ?
+    Exclamation, // !
+    At, // @
+    Hash, // #
+    Tilde, // ~
+
+    Backtick, // `
+    SingleQuote, // '
+    DoubleQuote, // "
+
+    LBracket, // (
+    RBracket, // )
+    LSquare, // [
+    RSquare, // ]
+    LBrace, // {
+    RBrace, // }
+    LAngle, // <
+    RAngle, // >
+
+    //====== Other ======//
+    EOF, // End of file
+    Number, // Consecutive `0-9`
+    Word, // Consecutive `a-zA-Z`
+};
