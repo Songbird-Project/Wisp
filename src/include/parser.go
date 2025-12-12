@@ -86,8 +86,8 @@ func (p *Parser) parse(exprs int, toParse *string) ([]*ASTNode, *Error, int) {
 		if unicode.IsLetter(rune(line[char])) {
 			node.Kind = AST_Id
 
-			for symbol := char; symbol < len(line) && unicode.IsLetter(rune(line[symbol])); symbol++ {
-				node.Value += string(line[symbol])
+			for char < len(line) && unicode.IsLetter(rune(line[char])) {
+				node.Value += string(line[char])
 				char++
 			}
 
@@ -125,16 +125,16 @@ func (p *Parser) parse(exprs int, toParse *string) ([]*ASTNode, *Error, int) {
 		} else if unicode.IsNumber(rune(line[char])) {
 			node.Kind = AST_Int
 
-			for symbol := char; symbol < len(line) && !unicode.IsSpace(rune(line[symbol])); symbol++ {
-				node.Value += string(line[symbol])
+			for char < len(line) && !unicode.IsSpace(rune(line[char])) {
+				node.Value += string(line[char])
 
-				if unicode.IsLetter(rune(line[symbol])) {
+				if unicode.IsLetter(rune(line[char])) {
 					switch node.Kind {
 					case AST_Int:
 						node.Kind = AST_Id
 
-						if symbol > 0 && line[symbol-1] == '0' {
-							switch line[symbol] {
+						if char > 0 && line[char-1] == '0' {
+							switch line[char] {
 							case 'x':
 								node.Kind = AST_Hex
 							case 'b':
@@ -142,35 +142,35 @@ func (p *Parser) parse(exprs int, toParse *string) ([]*ASTNode, *Error, int) {
 							}
 						}
 					case AST_Binary:
-						err := fmt.Sprintf("Invalid symbol found in binary, expected `0` or `1`: `%s`", string(line[symbol]))
+						err := fmt.Sprintf("Invalid char found in binary, expected `0` or `1`: `%s`", string(line[char]))
 						return nil, &Error{err, 20}, char
 					case AST_Hex:
-						if !strings.Contains("ABCDEFabcdef", string(line[symbol])) {
-							err := fmt.Sprintf("Invalid symbol found in hexadecimal, expected `0-9`, `a-f` or `A-F`: `%s`", string(line[symbol]))
+						if !strings.Contains("ABCDEFabcdef", string(line[char])) {
+							err := fmt.Sprintf("Invalid char found in hexadecimal, expected `0-9`, `a-f` or `A-F`: `%s`", string(line[char]))
 							return nil, &Error{err, 20}, char
 						}
 					case AST_Float:
-						err := fmt.Sprintf("Invalid symbol in float, expected `0-9`: `%s`", string(line[symbol]))
+						err := fmt.Sprintf("Invalid char in float, expected `0-9`: `%s`", string(line[char]))
 						return nil, &Error{err, 21}, char
 					}
-				} else if line[symbol] == '.' {
-					if char < len(line) && unicode.IsSymbol(rune(line[char+1])) {
+				} else if line[char] == '.' {
+					if char+1 < len(line) && unicode.IsSymbol(rune(line[char+1])) {
 						node.Value = node.Value[:len(node.Value)-1]
 						char--
 						break
 					} else if node.Kind == AST_Float {
-						err := fmt.Sprintf("Invalid symbol in float, expected `0-9`: `%s`", string(line[symbol]))
+						err := fmt.Sprintf("Invalid char in float, expected `0-9`: `%s`", string(line[char]))
 						return nil, &Error{err, 21}, char
 					} else {
 						node.Kind = AST_Float
 					}
-				} else if unicode.IsSymbol(rune(line[symbol])) || strings.Contains("+-*/^%", string(line[symbol])) {
+				} else if unicode.IsSymbol(rune(line[char])) || strings.Contains("+-*/^%", string(line[char])) {
 					node.Value = node.Value[:len(node.Value)-1]
 					char--
 					break
 				}
 
-				if !unicode.IsSymbol(rune(line[symbol])) {
+				if !unicode.IsSymbol(rune(line[char])) {
 					char++
 				}
 			}
@@ -183,8 +183,8 @@ func (p *Parser) parse(exprs int, toParse *string) ([]*ASTNode, *Error, int) {
 			// Move over the first quote
 			char++
 
-			for symbol := char; symbol < len(line) && !strings.Contains("'\"`", string(line[char])); symbol++ {
-				node.Value += string(line[symbol])
+			for char < len(line) && !strings.Contains("'\"`", string(line[char])) {
+				node.Value += string(line[char])
 				char++
 			}
 
@@ -238,6 +238,16 @@ func (p *Parser) parse(exprs int, toParse *string) ([]*ASTNode, *Error, int) {
 			char = newChar
 		} else if p.Context == AST_Block && line[char] == '}' {
 			return nil, nil, char
+		} else if line[char] == '(' {
+			groupNode, newChar, err := p.parseGroup(line, char)
+			if err != nil {
+				return nil, err, char
+			}
+
+			node = groupNode
+			char = newChar
+		} else if (p.Context == AST_Function || p.Context == AST_Group) && line[char] == ')' {
+			return nil, nil, char
 		} else {
 			err := fmt.Sprintf("Invalid symbol: `%s`", string(line[char]))
 			return nil, &Error{err, 22}, char
@@ -247,9 +257,9 @@ func (p *Parser) parse(exprs int, toParse *string) ([]*ASTNode, *Error, int) {
 		nodes = append(nodes, node)
 	}
 
-	// for _, node := range nodes {
-	// fmt.Printf("Value: %s, Kind: %s\n", node.Value, node.Kind)
-	// }
+	for _, node := range nodes {
+		fmt.Printf("Value: %s, Kind: %s\n", node.Value, node.Kind)
+	}
 
 	return nodes, nil, char
 }
@@ -298,18 +308,23 @@ func (p *Parser) parseOp(line string, char int, nodes []*ASTNode) (*ASTNode, int
 		node.Kind = AST_Mul
 		char++
 	case '/':
-		node.Kind = AST_Mul
+		node.Kind = AST_Div
 		char++
 	case '%':
-		node.Kind = AST_Mul
+		node.Kind = AST_Mod
 		char++
 	case '^':
-		node.Kind = AST_Mul
+		node.Kind = AST_Pow
 		char++
 
 	//====== Bitwise ======//
 	case '.':
 		char++
+
+		if char >= len(line) {
+			err := "Expected operator after bitwise initializer"
+			return nil, char, nodes, &Error{err, 25}
+		}
 
 		switch line[char] {
 		case '&':
@@ -549,39 +564,6 @@ func (p *Parser) parseTypeOp(line string, char int, nodes []*ASTNode) (*ASTNode,
 	return node, char, nodes, nil
 }
 
-func (p *Parser) parseBlock(line string, char int) (*ASTNode, int, *Error) {
-	node := &ASTNode{}
-	node.Kind = AST_Block
-	node.Children = []*ASTNode{}
-
-	char++
-
-	p.Context = AST_Block
-
-	for p.Scanner.Scan() {
-		line = p.Scanner.Text()
-		char = 0
-
-		nodes, err, newChar := p.parse(-1, &line)
-		if err != nil {
-			return nil, char, err
-		}
-
-		char = newChar
-
-		if len(line) > 0 && char < len(line) && line[char] != '}' {
-			break
-		}
-
-		node.Children = append(node.Children, nodes...)
-	}
-
-	p.Context = AST_Nil
-	char++
-
-	return node, char, nil
-}
-
 func (p *Parser) parseFn(line string, char int) (*ASTNode, int, *Error) {
 	p.Context = AST_Function
 
@@ -600,6 +582,18 @@ func (p *Parser) parseFn(line string, char int) (*ASTNode, int, *Error) {
 	}
 
 	node.Value = name[0].Value
+	char += newChar
+
+	for char < len(line) && unicode.IsSpace(rune(line[char])) {
+		char++
+	}
+
+	params, newChar, err := p.parseGroup(line, char)
+	if err != nil {
+		return nil, char, err
+	}
+
+	node.Params = params.Params
 	char = newChar
 
 	for char < len(line) && unicode.IsSpace(rune(line[char])) {
@@ -615,6 +609,138 @@ func (p *Parser) parseFn(line string, char int) (*ASTNode, int, *Error) {
 	char = newChar
 
 	p.Context = AST_Nil
+
+	return node, char, nil
+}
+
+func (p *Parser) parseBlock(line string, char int) (*ASTNode, int, *Error) {
+	node := &ASTNode{}
+	node.Kind = AST_Block
+	node.Children = []*ASTNode{}
+
+	if line[char] != '{' {
+		err := fmt.Sprintf("Invalid open block: %s", string(line[char]))
+		return nil, char, &Error{err, 28}
+	}
+	char++
+
+	p.Context = AST_Block
+
+	for char < len(line) && line[char] != '}' {
+		for char < len(line) && unicode.IsSpace(rune(line[char])) {
+			char++
+		}
+
+		if char >= len(line) {
+			if !p.Scanner.Scan() {
+				err := "Unexpected EOF in block"
+				return nil, char, &Error{err, 28}
+			}
+			line = p.Scanner.Text()
+			char = 0
+			continue
+		}
+
+		if line[char] == '}' {
+			break
+		}
+
+		loc := line[char:]
+		nodes, err, newChar := p.parse(-1, &loc)
+		if err != nil {
+			return nil, char, err
+		}
+
+		char += newChar
+
+		node.Children = append(node.Children, nodes...)
+	}
+
+	if char >= len(line) || line[char] != '}' {
+		err := "Missing closing `}` in block"
+		return nil, char, &Error{err, 28}
+	}
+
+	for char < len(line) && unicode.IsSpace(rune(line[char])) {
+		char++
+	}
+
+	p.Context = AST_Nil
+	char++
+
+	return node, char, nil
+}
+
+func (p *Parser) parseGroup(line string, char int) (*ASTNode, int, *Error) {
+	node := &ASTNode{}
+	node.Kind = AST_Group
+	node.Params = [][]*ASTNode{}
+
+	if line[char] != '(' {
+		err := fmt.Sprintf("Invalid open group: %s", string(line[char]))
+		return nil, char, &Error{err, 28}
+	}
+	char++
+
+	if p.Context == AST_Nil {
+		p.Context = AST_Group
+	}
+
+	for {
+		for char < len(line) && unicode.IsSpace(rune(line[char])) {
+			char++
+		}
+
+		if char >= len(line) {
+			if !p.Scanner.Scan() {
+				err := "Unexpected EOF in group"
+				return nil, char, &Error{err, 28}
+			}
+
+			line = p.Scanner.Text()
+			char = 0
+			continue
+		}
+
+		if line[char] == ')' {
+			break
+		}
+
+		exprs := -1
+		if p.Context == AST_Function {
+			exprs = 2
+		}
+
+		loc := line[char:]
+		param, err, newChar := p.parse(exprs, &loc)
+		if err != nil {
+			return nil, char, err
+		}
+
+		if p.Context == AST_Function &&
+			(len(param) != 2 ||
+				(len(param) == 2 &&
+					(param[0].Kind != AST_Id || param[1].Kind != AST_Id))) {
+			err := "Expected name and type for function parameter"
+			return nil, char, &Error{err, 28}
+		}
+
+		for char < len(line) && unicode.IsSpace(rune(line[char])) {
+			char++
+		}
+
+		char += newChar
+
+		node.Params = append(node.Params, param)
+	}
+
+	if char >= len(line) || line[char] != ')' {
+		err := "Missing closing `)` in group"
+		return nil, char, &Error{err, 28}
+	}
+
+	p.Context = AST_Nil
+	char++
 
 	return node, char, nil
 }
