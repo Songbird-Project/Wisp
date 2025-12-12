@@ -22,7 +22,7 @@ type ASTNode struct {
 	RHS      *ASTNode
 	Alt      *ASTNode
 	Children []*ASTNode
-	Params   []string
+	Params   [][]*ASTNode
 	Value    string
 }
 
@@ -109,6 +109,7 @@ const (
 	AST_Root     // FILE
 	AST_Function // fn Id(Id T) RHS
 	AST_Block    // {...}
+	AST_Group    // (...)
 	AST_Call     // f(x)
 )
 
@@ -194,6 +195,7 @@ var astName = map[ASTKind]string{
 	AST_Root:     "Root",
 	AST_Function: "Function Declaration",
 	AST_Block:    "Block",
+	AST_Group:    "Group",
 	AST_Call:     "Function Call",
 }
 
