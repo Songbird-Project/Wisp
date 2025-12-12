@@ -7,7 +7,7 @@ pub const astNode = struct {
     rhs: ?*astNode = null,
     alt: ?*astNode = null,
     children: ?*std.ArrayList(astNode) = null,
-    params: ?*std.ArrayList([]u8) = null,
+    params: ?*std.ArrayList([]const u8) = null,
     name: ?*[]u8 = null,
 };
 
@@ -80,7 +80,7 @@ pub const astType = enum {
 
 pub const Token = struct {
     kind: TokKind = TokKind.EOF,
-    value: []u8 = "",
+    value: []const u8 = "",
 };
 
 pub const TokKind = enum {
@@ -122,4 +122,20 @@ pub const TokKind = enum {
     EOF, // End of file
     Number, // Consecutive `0-9`
     Word, // Consecutive `a-zA-Z`
+};
+
+pub const TokenIterator = struct {
+    tokens: []Token,
+    index: 0,
+
+    fn next(self: *TokenIterator) ?Token {
+        const index = self.index;
+        self.index += 1;
+        return self.tokens[index];
+    }
+};
+
+pub const Error = struct {
+    message: []const u8,
+    code: u8,
 };
