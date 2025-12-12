@@ -1,10 +1,16 @@
 const std = @import("std");
-const ast = @import("./ast.zig");
+const lexer = @import("lexer.zig");
 
 pub fn main() !void {
-    var gpa = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer _ = gpa.deinit();
-    const alloc = gpa.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var arena = std.heap.ArenaAllocator.init(gpa.allocator());
+    defer arena.deinit();
+    const alloc = arena.allocator();
 
-    _ = try ast.Parse(alloc);
+    var argv = try std.process.argsWithAllocator(alloc);
+    defer argv.deinit();
+    _ = argv.next();
+    const filename = if (argv.next()) |a| std.mem.sliceTo(a, 0) else "main.wp";
+
+    _ = try lexer.Lex(filename, alloc);
 }
