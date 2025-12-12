@@ -1,0 +1,46 @@
+const std = @import("std");
+const types = @import("types");
+
+pub fn Lex(filename: [:0]const u8, alloc: std.mem.Allocator) ![]types.Token {
+    var tokens: std.ArrayList(types.Token) = .empty;
+    const src = try ReadFile(filename, alloc);
+
+    for (src, 0..) |line, index| {
+        if (line.len == 0 or index == 9) continue;
+    }
+
+    return try tokens.toOwnedSlice(alloc);
+}
+
+fn ReadFile(filename: [:0]const u8, alloc: std.mem.Allocator) ![][]u8 {
+    var file = try std.fs.cwd().openFile(filename, .{ .mode = .read_only });
+    defer file.close();
+
+    var read_buf: [2048]u8 = undefined;
+    var file_reader: std.fs.File.Reader = file.reader(&read_buf);
+    const reader = &file_reader.interface;
+
+    var lines: std.ArrayList([]u8) = .empty;
+    var line_writer = std.io.Writer.Allocating.init(alloc);
+    var line: []const u8 = undefined;
+
+    while (true) {
+        _ = reader.streamDelimiter(&line_writer.writer, '\n') catch |err| {
+            if (err == error.EndOfStream) break else return err;
+        };
+        _ = reader.toss(1);
+
+        line = std.mem.trim(u8, line_writer.written(), " \t\r\n");
+
+        const line_copy = try alloc.dupe(u8, line);
+        try lines.append(alloc, line_copy);
+        line_writer.clearRetainingCapacity();
+    }
+
+    if (line.len > 0) {
+        const line_copy = try alloc.dupe(u8, line);
+        try lines.append(alloc, line_copy);
+    }
+
+    return lines.toOwnedSlice(alloc);
+}
