@@ -1,16 +1,37 @@
 const std = @import("std");
-const types = @import("types");
+const types = @import("./types.zig");
 
 pub fn lex(filename: [:0]const u8, alloc: std.mem.Allocator) !types.Result(types.TokenIterator) {
     var tokenList: std.ArrayList(types.Token) = .empty;
     const src = try readFile(filename, alloc);
 
     for (src, 0..) |line, lineNum| {
-        for (line, 0..) |char, lineCol| {
+        var lineCol: usize = 0;
+
+        while (lineCol < line.len) : (lineCol += 1) {
+            const char = line[lineCol];
             var token: types.Token = .{};
+
+            if (std.ascii.isWhitespace(char)) continue;
 
             if (types.TokKind.charToKind(char)) |kind| {
                 token.kind = kind;
+            } else if (std.ascii.isDigit(char)) {
+                const start = lineCol;
+                while (lineCol < line.len and std.ascii.isDigit(line[lineCol])) : (lineCol += 1) {}
+
+                lineCol -= 1;
+                token.kind = .Number;
+                token.value = line[start..lineCol];
+            } else if (std.ascii.isAlphabetic(char) or char == '_') {
+                const start = lineCol;
+                while (lineCol < line.len and
+                    (std.ascii.isAlphanumeric(line[lineCol]) or line[lineCol] == '_')) : (lineCol += 1)
+                {}
+
+                lineCol -= 1;
+                token.kind = .Word;
+                token.value = line[start..lineCol];
             } else {
                 return .{
                     .err = .{ .message = try std.fmt.allocPrint(
