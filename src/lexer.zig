@@ -7,18 +7,18 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
 
     for (src, 0..) |line, line_num| {
         var col: usize = 0;
-        if (line.len == 0 or line.len >= 2 and line[0] == '/' and line[1] == '/') continue;
 
         while (col < line.len) : (col += 1) {
             const char = line[col];
             var token: types.Token = .{};
 
             if (std.ascii.isWhitespace(char)) continue;
+            if (std.mem.startsWith(u8, line[col..], "//")) break;
 
             if (types.TokKind.charToKind(char)) |kind| {
                 token = .{
                     .kind = kind,
-                    .value = &[_]u8{char},
+                    .value = line[col .. col + 1],
                     .line_num = line_num,
                     .line_col = col,
                     .line_col_end = col,
@@ -30,7 +30,7 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
                 col -= 1;
                 token = .{
                     .kind = .Number,
-                    .value = line[start..col],
+                    .value = line[start .. col + 1],
                     .line_num = line_num,
                     .line_col = start,
                     .line_col_end = col,
@@ -44,7 +44,7 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
                 col -= 1;
                 token = .{
                     .kind = .Word,
-                    .value = line[start..col],
+                    .value = line[start .. col + 1],
                     .line_num = line_num,
                     .line_col = start,
                     .line_col_end = col,
@@ -56,7 +56,7 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
                         "unexpected character in file",
                         filename,
                         line,
-                        &[_]u8{char},
+                        line[col .. col + 1],
                         line_num,
                         col,
                         col,
@@ -84,24 +84,21 @@ pub fn readFile(alloc: std.mem.Allocator, filename: [:0]const u8) ![][]u8 {
     const reader = &file_reader.interface;
 
     var lines: std.ArrayList([]u8) = .empty;
-    var line_writer = std.io.Writer.Allocating.init(alloc);
-    var line: []const u8 = undefined;
+    var line = std.io.Writer.Allocating.init(alloc);
 
     while (true) {
-        _ = reader.streamDelimiter(&line_writer.writer, '\n') catch |err| {
+        _ = reader.streamDelimiter(&line.writer, '\n') catch |err| {
             if (err == error.EndOfStream) break else return err;
         };
         _ = reader.toss(1);
 
-        line = std.mem.trim(u8, line_writer.written(), " \t\r\n");
-
-        const line_copy = try alloc.dupe(u8, line);
+        const line_copy = try alloc.dupe(u8, line.written());
         try lines.append(alloc, line_copy);
-        line_writer.clearRetainingCapacity();
+        line.clearRetainingCapacity();
     }
 
-    if (line.len > 0) {
-        const line_copy = try alloc.dupe(u8, line);
+    if (line.written().len > 0) {
+        const line_copy = try alloc.dupe(u8, line.written());
         try lines.append(alloc, line_copy);
     }
 
