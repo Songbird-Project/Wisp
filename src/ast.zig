@@ -1,7 +1,8 @@
 const std = @import("std");
 const types = @import("./types.zig");
+const errors = @import("./error.zig");
 
-pub fn parse(alloc: std.mem.Allocator, filename: []const u8, tokens: *types.TokenIterator) !types.Result(types.AST) {
+pub fn parse(alloc: std.mem.Allocator, filename: []const u8, tokens: *types.TokenIterator) !errors.Result(types.AST) {
     var nodes: std.ArrayList(types.AstNode) = .empty;
 
     while (tokens.next()) |token| {
@@ -18,8 +19,8 @@ pub fn parse(alloc: std.mem.Allocator, filename: []const u8, tokens: *types.Toke
                         "unexpected token: {s}:{d}:{d} {c}",
                         .{
                             filename,
-                            0,
-                            0,
+                            token.line_num,
+                            token.line_col,
                             types.TokKind.kindToChar(token.kind),
                         },
                     ),

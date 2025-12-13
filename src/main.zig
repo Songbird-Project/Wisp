@@ -20,5 +20,5 @@ pub fn main() !void {
         std.process.exit(err.code);
     }
 
-    _ = try ast.parse(alloc, &tokens.ok);
+    _ = try ast.parse(alloc, filename, &tokens.ok);
 }
