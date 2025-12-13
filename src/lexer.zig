@@ -51,16 +51,15 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
                 };
             } else {
                 return .{
-                    .err = .{ .message = try std.fmt.allocPrint(
+                    .err = .{ .message = try errors.format(
                         alloc,
-                        "unexpected character in file: {s}:{d}:{d} `{c}`\n{s}",
-                        .{
-                            filename,
-                            line_num + 1,
-                            col + 1,
-                            char,
-                            src[line_num],
-                        },
+                        "unexpected character in file",
+                        filename,
+                        line,
+                        &[_]u8{char},
+                        line_num,
+                        col,
+                        col,
                     ), .code = 1 },
                 };
             }
