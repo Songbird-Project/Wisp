@@ -94,6 +94,7 @@ pub const Token = struct {
     value: []const u8 = "",
     line_num: usize = 0,
     line_col: usize = 0,
+    line_col_end: usize = 0,
 };
 
 pub const TokKind = enum {
