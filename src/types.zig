@@ -126,7 +126,7 @@ pub const TokKind = enum {
 
 pub const TokenIterator = struct {
     tokens: []Token,
-    index: 0,
+    index: u8 = 0,
 
     fn next(self: *TokenIterator) ?Token {
         const index = self.index;
@@ -139,3 +139,10 @@ pub const Error = struct {
     message: []const u8,
     code: u8,
 };
+
+pub fn Result(comptime T: type) type {
+    return union(enum) {
+        ok: T,
+        err: Error,
+    };
+}
