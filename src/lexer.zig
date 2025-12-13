@@ -8,6 +8,7 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8) !errors.Result(type
 
     for (src, 0..) |line, line_num| {
         var col: usize = 0;
+        if (line.len == 0 or line.len >= 2 and line[0] == '/' and line[1] == '/') continue;
 
         while (col < line.len) : (col += 1) {
             const char = line[col];
