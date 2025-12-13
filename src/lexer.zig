@@ -1,15 +1,36 @@
 const std = @import("std");
 const types = @import("types");
 
-pub fn Lex(filename: [:0]const u8, alloc: std.mem.Allocator) ![]types.Token {
-    var tokens: std.ArrayList(types.Token) = .empty;
+pub fn Lex(filename: [:0]const u8, alloc: std.mem.Allocator) !types.Result(types.TokenIterator) {
+    var tokenList: std.ArrayList(types.Token) = .empty;
     const src = try ReadFile(filename, alloc);
 
-    for (src, 0..) |line, index| {
-        if (line.len == 0 or index == 9) continue;
+    for (src, 0..) |line, lineNum| {
+        for (line, 0..) |char, lineCol| {
+            switch (char) {
+                else => {
+                    return .{
+                        .err = .{ .message = try std.fmt.allocPrint(
+                            alloc,
+                            "Unexpected character in file: {s}:{d}:{d} `{c}`\n",
+                            .{
+                                filename,
+                                lineNum,
+                                lineCol,
+                                char,
+                            },
+                        ), .code = 1 },
+                    };
+                },
+            }
+        }
     }
 
-    return try tokens.toOwnedSlice(alloc);
+    return .{
+        .ok = .{
+            .tokens = try tokenList.toOwnedSlice(alloc),
+        },
+    };
 }
 
 fn ReadFile(filename: [:0]const u8, alloc: std.mem.Allocator) ![][]u8 {
