@@ -104,6 +104,7 @@ pub const TokKind = enum {
     At, // @
     Hash, // #
     Tilde, // ~
+    Colon, // :
 
     Backtick, // `
     SingleQuote, // '
@@ -144,6 +145,7 @@ pub const TokKind = enum {
             '@' => .At,
             '#' => .Hash,
             '~' => .Tilde,
+            ':' => .Colon,
             '`' => .Backtick,
             '\'' => .SingleQuote,
             '"' => .DoubleQuote,
