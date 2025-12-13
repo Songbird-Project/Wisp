@@ -1,7 +1,8 @@
 const std = @import("std");
 const types = @import("./types.zig");
+const errors = @import("./error.zig");
 
-pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8) !types.Result(types.TokenIterator) {
+pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8) !errors.Result(types.TokenIterator) {
     var token_list: std.ArrayList(types.Token) = .empty;
     const src = try readFile(alloc, filename);
 
@@ -15,14 +16,23 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8) !types.Result(types
             if (std.ascii.isWhitespace(char)) continue;
 
             if (types.TokKind.charToKind(char)) |kind| {
-                token.kind = kind;
+                token = .{
+                    .kind = kind,
+                    .value = &[_]u8{char},
+                    .line_num = line_num,
+                    .line_col = col,
+                };
             } else if (std.ascii.isDigit(char)) {
                 const start = col;
                 while (col < line.len and std.ascii.isDigit(line[col])) : (col += 1) {}
 
                 col -= 1;
-                token.kind = .Number;
-                token.value = line[start..col];
+                token = .{
+                    .kind = .Number,
+                    .value = line[start..col],
+                    .line_num = line_num,
+                    .line_col = col,
+                };
             } else if (std.ascii.isAlphabetic(char) or char == '_') {
                 const start = col;
                 while (col < line.len and
@@ -30,8 +40,12 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8) !types.Result(types
                 {}
 
                 col -= 1;
-                token.kind = .Word;
-                token.value = line[start..col];
+                token = .{
+                    .kind = .Word,
+                    .value = line[start..col],
+                    .line_num = line_num,
+                    .line_col = col,
+                };
             } else {
                 return .{
                     .err = .{ .message = try std.fmt.allocPrint(
