@@ -19,7 +19,7 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
                 token = .{
                     .kind = kind,
                     .value = &[_]u8{char},
-                    .line_num = line_num,
+                    .line_num = line_num + 1,
                     .line_col = col,
                 };
             } else if (std.ascii.isDigit(char)) {
@@ -30,8 +30,8 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
                 token = .{
                     .kind = .Number,
                     .value = line[start..col],
-                    .line_num = line_num,
-                    .line_col = col,
+                    .line_num = line_num + 1,
+                    .line_col = start,
                 };
             } else if (std.ascii.isAlphabetic(char) or char == '_') {
                 const start = col;
@@ -43,19 +43,20 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
                 token = .{
                     .kind = .Word,
                     .value = line[start..col],
-                    .line_num = line_num,
-                    .line_col = col,
+                    .line_num = line_num + 1,
+                    .line_col = start,
                 };
             } else {
                 return .{
                     .err = .{ .message = try std.fmt.allocPrint(
                         alloc,
-                        "unexpected character in file: {s}:{d}:{d} `{c}`\n",
+                        "unexpected character in file: {s}:{d}:{d} `{c}`\n{s}",
                         .{
                             filename,
                             line_num,
                             col,
                             char,
+                            src[line],
                         },
                     ), .code = 1 },
                 };

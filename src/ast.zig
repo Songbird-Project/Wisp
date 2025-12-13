@@ -3,7 +3,6 @@ const types = @import("./types.zig");
 const errors = @import("./error.zig");
 
 pub fn parse(alloc: std.mem.Allocator, filename: []const u8, src: [][]u8, tokens: *types.TokenIterator) !errors.Result(types.AST) {
-    _ = src;
     var nodes: std.ArrayList(types.AstNode) = .empty;
 
     while (tokens.next()) |token| {
@@ -17,12 +16,13 @@ pub fn parse(alloc: std.mem.Allocator, filename: []const u8, src: [][]u8, tokens
                 .err = .{
                     .message = try std.fmt.allocPrint(
                         alloc,
-                        "unexpected token: {s}:{d}:{d} {s}",
+                        "unexpected token: {s}:{d}:{d} {s}\n{s}",
                         .{
                             filename,
                             token.line_num,
                             token.line_col,
                             types.TokKind.kindToString(token.kind),
+                            src[token.line_num - 1],
                         },
                     ),
                     .code = 1,
