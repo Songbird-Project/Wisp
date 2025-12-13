@@ -13,8 +13,9 @@ pub fn main() !void {
     const filename = if (argv.next()) |a| std.mem.sliceTo(a, 0) else "main.wp";
 
     const tokens = try lexer.lex(alloc, filename);
-    switch (tokens) {
-        .ok => std.debug.print("Ok\n", .{}),
-        .err => |err| std.debug.print("{s}\n", .{err.message}),
+    if (tokens == .err) {
+        const err = tokens.err;
+        std.debug.print("{s}\n", .{err.message});
+        std.process.exit(err.code);
     }
 }
