@@ -92,6 +92,8 @@ pub const AST = struct {
 pub const Token = struct {
     kind: TokKind = TokKind.EOF,
     value: []const u8 = "",
+    line_num: usize = 0,
+    line_col: usize = 0,
 };
 
 pub const TokKind = enum {
