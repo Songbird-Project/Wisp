@@ -21,7 +21,7 @@ pub fn parse(alloc: std.mem.Allocator, filename: []const u8, tokens: *types.Toke
                             filename,
                             token.line_num,
                             token.line_col,
-                            types.TokKind.kindToChar(token.kind),
+                            types.TokKind.kindToString(token.kind),
                         },
                     ),
                     .code = 1,
