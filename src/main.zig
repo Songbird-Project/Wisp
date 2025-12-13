@@ -1,5 +1,6 @@
 const std = @import("std");
 const lexer = @import("lexer.zig");
+const ast = @import("ast.zig");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -12,10 +13,12 @@ pub fn main() !void {
     _ = argv.next();
     const filename = if (argv.next()) |a| std.mem.sliceTo(a, 0) else "main.wp";
 
-    const tokens = try lexer.lex(alloc, filename);
+    var tokens = try lexer.lex(alloc, filename);
     if (tokens == .err) {
         const err = tokens.err;
         std.debug.print("{s}\n", .{err.message});
         std.process.exit(err.code);
     }
+
+    _ = try ast.parse(alloc, &tokens.ok);
 }
