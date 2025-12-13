@@ -1,17 +1,17 @@
 const std = @import("std");
 
-pub const astNode = struct {
-    kind: astType = astType.Root,
+pub const AstNode = struct {
+    kind: AstType = AstType.Root,
 
-    lhs: ?*astNode = null,
-    rhs: ?*astNode = null,
-    alt: ?*astNode = null,
-    children: ?*std.ArrayList(astNode) = null,
-    params: ?*std.ArrayList([]const u8) = null,
-    name: ?*[]u8 = null,
+    lhs: ?*AstNode = null,
+    rhs: ?*AstNode = null,
+    alt: ?*AstNode = null,
+    children: ?*AST = null,
+    params: [][]const u8 = null,
+    value: ?*[]u8 = null,
 };
 
-pub const astType = enum {
+pub const AstType = enum {
     //====== Binary operators ======//
     // Maths
     Add, // LHS + RHS
@@ -76,6 +76,17 @@ pub const astType = enum {
     ReturnSig, // [-~!?]> LHS RHS
     Block, // {...}
     Call, // f(x)
+};
+
+pub const AST = struct {
+    nodes: []AstNode,
+    _index: u8 = 0,
+
+    pub fn next(self: *AST) AstNode {
+        const index = self._index;
+        self._index += 1;
+        return self.nodes[index];
+    }
 };
 
 pub const Token = struct {
@@ -149,14 +160,51 @@ pub const TokKind = enum {
             '`' => .Backtick,
             '\'' => .SingleQuote,
             '"' => .DoubleQuote,
-            ')' => .RBracket,
             '(' => .LBracket,
+            ')' => .RBracket,
             '[' => .LSquare,
             ']' => .RSquare,
             '{' => .LBrace,
             '}' => .RBrace,
             '<' => .LAngle,
             '>' => .RAngle,
+            else => null,
+        };
+    }
+
+    pub fn kindToChar(char: u8) ?u8 {
+        return switch (char) {
+            .Plus => '+',
+            .Dash => '-',
+            .FSlash => '/',
+            .Star => '*',
+            .Percent => '%',
+            .Caret => '^',
+            .Pipe => '|',
+            .And => '&',
+            .Equals => '=',
+            .Dollar => '$',
+            .Underscore => '_',
+            .BSlash => '\\',
+            .Comma => ',',
+            .Period => '.',
+            .Question => '?',
+            .Exclamation => '!',
+            .At => '@',
+            .Hash => '#',
+            .Tilde => '~',
+            .Colon => ':',
+            .Backtick => '`',
+            .SingleQuote => '\'',
+            .DoubleQuote => '"',
+            .LBracket => '(',
+            .RBracket => ')',
+            .LSquare => '[',
+            .RSquare => ']',
+            .LBrace => '{',
+            .RBrace => '}',
+            .LAngle => '<',
+            .RAngle => '>',
             else => null,
         };
     }
@@ -172,15 +220,3 @@ pub const TokenIterator = struct {
         return self.tokens[index];
     }
 };
-
-pub const Error = struct {
-    message: []const u8,
-    code: u8,
-};
-
-pub fn Result(comptime T: type) type {
-    return union(enum) {
-        ok: T,
-        err: Error,
-    };
-}
