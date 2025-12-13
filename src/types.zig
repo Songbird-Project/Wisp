@@ -175,7 +175,7 @@ pub const TokKind = enum {
         };
     }
 
-    pub fn kindToString(char: TokKind) []const u8 {
+    pub fn kindToChar(char: TokKind) []const u8 {
         return switch (char) {
             .Plus => "+",
             .Dash => "-",
@@ -208,7 +208,7 @@ pub const TokKind = enum {
             .RBrace => "}",
             .LAngle => "<",
             .RAngle => ">",
-            else => "unrecognised symbol",
+            else => "\u{FFFD}",
         };
     }
 };
