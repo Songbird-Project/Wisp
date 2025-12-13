@@ -14,7 +14,7 @@ pub fn main() !void {
 
     const tokens = try lexer.lex(filename, alloc);
     switch (tokens) {
-        .ok => std.debug.print("Ok", .{}),
-        .err => std.debug.print("Error", .{}),
+        .ok => std.debug.print("Ok\n", .{}),
+        .err => |err| std.debug.print("{s}\n", .{err.message}),
     }
 }
