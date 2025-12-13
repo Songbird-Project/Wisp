@@ -12,5 +12,9 @@ pub fn main() !void {
     _ = argv.next();
     const filename = if (argv.next()) |a| std.mem.sliceTo(a, 0) else "main.wp";
 
-    _ = try lexer.Lex(filename, alloc);
+    const tokens = try lexer.lex(filename, alloc);
+    switch (tokens) {
+        .ok => std.debug.print("Ok", .{}),
+        .err => std.debug.print("Error", .{}),
+    }
 }
