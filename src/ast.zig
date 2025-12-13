@@ -12,17 +12,27 @@ pub fn parse(alloc: std.mem.Allocator, filename: []const u8, src: [][]u8, tokens
             node.kind = .Id;
             node.value = token.value;
         } else {
+            var columns: []const u8 = undefined;
+            if (token.line_col == token.line_col_end) {
+                columns = try std.fmt.allocPrint(alloc, "{d}", .{token.line_col + 1});
+            } else {
+                columns = try std.fmt.allocPrint(alloc, "{d}-{d}", .{
+                    token.line_col + 1,
+                    token.line_col_end + 1,
+                });
+            }
+
             return .{
                 .err = .{
                     .message = try std.fmt.allocPrint(
                         alloc,
-                        "unexpected token: {s}:{d}:{d} {s}\n{s}",
+                        "unexpected token: {s}:{d}:{s} `{s}`\n{s}",
                         .{
                             filename,
-                            token.line_num,
-                            token.line_col,
+                            token.line_num + 1,
+                            columns,
                             types.TokKind.kindToString(token.kind),
-                            src[token.line_num - 1],
+                            src[token.line_num],
                         },
                     ),
                     .code = 1,

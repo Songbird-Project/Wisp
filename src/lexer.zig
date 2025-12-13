@@ -19,8 +19,9 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
                 token = .{
                     .kind = kind,
                     .value = &[_]u8{char},
-                    .line_num = line_num + 1,
+                    .line_num = line_num,
                     .line_col = col,
+                    .line_col_end = col,
                 };
             } else if (std.ascii.isDigit(char)) {
                 const start = col;
@@ -30,8 +31,9 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
                 token = .{
                     .kind = .Number,
                     .value = line[start..col],
-                    .line_num = line_num + 1,
+                    .line_num = line_num,
                     .line_col = start,
+                    .line_col_end = col,
                 };
             } else if (std.ascii.isAlphabetic(char) or char == '_') {
                 const start = col;
@@ -43,8 +45,9 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
                 token = .{
                     .kind = .Word,
                     .value = line[start..col],
-                    .line_num = line_num + 1,
+                    .line_num = line_num,
                     .line_col = start,
+                    .line_col_end = col,
                 };
             } else {
                 return .{
@@ -53,10 +56,10 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
                         "unexpected character in file: {s}:{d}:{d} `{c}`\n{s}",
                         .{
                             filename,
-                            line_num,
-                            col,
+                            line_num + 1,
+                            col + 1,
                             char,
-                            src[line],
+                            src[line_num],
                         },
                     ), .code = 1 },
                 };
