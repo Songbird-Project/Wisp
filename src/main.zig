@@ -20,5 +20,10 @@ pub fn main() !void {
         std.process.exit(err.code);
     }
 
-    _ = try ast.parse(alloc, filename, &tokens.ok);
+    const tree = try ast.parse(alloc, filename, &tokens.ok);
+    if (tree == .err) {
+        const err = tree.err;
+        std.debug.print("{s}\n", .{err.message});
+        std.process.exit(err.code);
+    }
 }
