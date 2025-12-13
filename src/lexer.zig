@@ -1,28 +1,32 @@
 const std = @import("std");
 const types = @import("types");
 
-pub fn Lex(filename: [:0]const u8, alloc: std.mem.Allocator) !types.Result(types.TokenIterator) {
+pub fn lex(filename: [:0]const u8, alloc: std.mem.Allocator) !types.Result(types.TokenIterator) {
     var tokenList: std.ArrayList(types.Token) = .empty;
-    const src = try ReadFile(filename, alloc);
+    const src = try readFile(filename, alloc);
 
     for (src, 0..) |line, lineNum| {
         for (line, 0..) |char, lineCol| {
-            switch (char) {
-                else => {
-                    return .{
-                        .err = .{ .message = try std.fmt.allocPrint(
-                            alloc,
-                            "Unexpected character in file: {s}:{d}:{d} `{c}`\n",
-                            .{
-                                filename,
-                                lineNum,
-                                lineCol,
-                                char,
-                            },
-                        ), .code = 1 },
-                    };
-                },
+            var token: types.Token = .{};
+
+            if (types.TokKind.charToKind(char)) |kind| {
+                token.kind = kind;
+            } else {
+                return .{
+                    .err = .{ .message = try std.fmt.allocPrint(
+                        alloc,
+                        "Unexpected character in file: {s}:{d}:{d} `{c}`\n",
+                        .{
+                            filename,
+                            lineNum,
+                            lineCol,
+                            char,
+                        },
+                    ), .code = 1 },
+                };
             }
+
+            try tokenList.append(alloc, token);
         }
     }
 
@@ -33,7 +37,7 @@ pub fn Lex(filename: [:0]const u8, alloc: std.mem.Allocator) !types.Result(types
     };
 }
 
-fn ReadFile(filename: [:0]const u8, alloc: std.mem.Allocator) ![][]u8 {
+fn readFile(filename: [:0]const u8, alloc: std.mem.Allocator) ![][]u8 {
     var file = try std.fs.cwd().openFile(filename, .{ .mode = .read_only });
     defer file.close();
 
