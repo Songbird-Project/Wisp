@@ -2,9 +2,8 @@ const std = @import("std");
 const types = @import("./types.zig");
 const errors = @import("./error.zig");
 
-pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8) !errors.Result(types.TokenIterator) {
+pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !errors.Result(types.TokenIterator) {
     var token_list: std.ArrayList(types.Token) = .empty;
-    const src = try readFile(alloc, filename);
 
     for (src, 0..) |line, line_num| {
         var col: usize = 0;
@@ -73,7 +72,7 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8) !errors.Result(type
     };
 }
 
-fn readFile(alloc: std.mem.Allocator, filename: [:0]const u8) ![][]u8 {
+pub fn readFile(alloc: std.mem.Allocator, filename: [:0]const u8) ![][]u8 {
     var file = try std.fs.cwd().openFile(filename, .{ .mode = .read_only });
     defer file.close();
 
