@@ -1,15 +1,15 @@
 const std = @import("std");
 const types = @import("./types.zig");
 
-pub fn lex(filename: [:0]const u8, alloc: std.mem.Allocator) !types.Result(types.TokenIterator) {
-    var tokenList: std.ArrayList(types.Token) = .empty;
-    const src = try readFile(filename, alloc);
+pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8) !types.Result(types.TokenIterator) {
+    var token_list: std.ArrayList(types.Token) = .empty;
+    const src = try readFile(alloc, filename);
 
-    for (src, 0..) |line, lineNum| {
-        var lineCol: usize = 0;
+    for (src, 0..) |line, line_num| {
+        var col: usize = 0;
 
-        while (lineCol < line.len) : (lineCol += 1) {
-            const char = line[lineCol];
+        while (col < line.len) : (col += 1) {
+            const char = line[col];
             var token: types.Token = .{};
 
             if (std.ascii.isWhitespace(char)) continue;
@@ -17,21 +17,21 @@ pub fn lex(filename: [:0]const u8, alloc: std.mem.Allocator) !types.Result(types
             if (types.TokKind.charToKind(char)) |kind| {
                 token.kind = kind;
             } else if (std.ascii.isDigit(char)) {
-                const start = lineCol;
-                while (lineCol < line.len and std.ascii.isDigit(line[lineCol])) : (lineCol += 1) {}
+                const start = col;
+                while (col < line.len and std.ascii.isDigit(line[col])) : (col += 1) {}
 
-                lineCol -= 1;
+                col -= 1;
                 token.kind = .Number;
-                token.value = line[start..lineCol];
+                token.value = line[start..col];
             } else if (std.ascii.isAlphabetic(char) or char == '_') {
-                const start = lineCol;
-                while (lineCol < line.len and
-                    (std.ascii.isAlphanumeric(line[lineCol]) or line[lineCol] == '_')) : (lineCol += 1)
+                const start = col;
+                while (col < line.len and
+                    (std.ascii.isAlphanumeric(line[col]) or line[col] == '_')) : (col += 1)
                 {}
 
-                lineCol -= 1;
+                col -= 1;
                 token.kind = .Word;
-                token.value = line[start..lineCol];
+                token.value = line[start..col];
             } else {
                 return .{
                     .err = .{ .message = try std.fmt.allocPrint(
@@ -39,26 +39,26 @@ pub fn lex(filename: [:0]const u8, alloc: std.mem.Allocator) !types.Result(types
                         "Unexpected character in file: {s}:{d}:{d} `{c}`\n",
                         .{
                             filename,
-                            lineNum,
-                            lineCol,
+                            line_num,
+                            col,
                             char,
                         },
                     ), .code = 1 },
                 };
             }
 
-            try tokenList.append(alloc, token);
+            try token_list.append(alloc, token);
         }
     }
 
     return .{
         .ok = .{
-            .tokens = try tokenList.toOwnedSlice(alloc),
+            .tokens = try token_list.toOwnedSlice(alloc),
         },
     };
 }
 
-fn readFile(filename: [:0]const u8, alloc: std.mem.Allocator) ![][]u8 {
+fn readFile(alloc: std.mem.Allocator, filename: [:0]const u8) ![][]u8 {
     var file = try std.fs.cwd().openFile(filename, .{ .mode = .read_only });
     defer file.close();
 
