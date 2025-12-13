@@ -36,7 +36,7 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8) !types.Result(types
                 return .{
                     .err = .{ .message = try std.fmt.allocPrint(
                         alloc,
-                        "Unexpected character in file: {s}:{d}:{d} `{c}`\n",
+                        "unexpected character in file: {s}:{d}:{d} `{c}`\n",
                         .{
                             filename,
                             line_num,
