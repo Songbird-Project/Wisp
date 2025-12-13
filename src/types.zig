@@ -122,15 +122,21 @@ pub const TokKind = enum {
     EOF, // End of file
     Number, // Consecutive `0-9`
     Word, // Consecutive `a-zA-Z`
+
+    pub fn charToKind(char: u8) ?TokKind {
+        return switch (char) {
+            else => null,
+        };
+    }
 };
 
 pub const TokenIterator = struct {
     tokens: []Token,
-    index: u8 = 0,
+    _index: u8 = 0,
 
-    fn next(self: *TokenIterator) ?Token {
-        const index = self.index;
-        self.index += 1;
+    pub fn next(self: *TokenIterator) ?Token {
+        const index = self._index;
+        self._index += 1;
         return self.tokens[index];
     }
 };
