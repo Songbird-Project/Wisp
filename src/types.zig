@@ -1,18 +1,65 @@
 const std = @import("std");
 const numbers = @import("numbers.zig");
 
-pub const AstNode = struct {
-    kind: AstType = .Root,
-
-    lhs: ?*AstNode = null,
-    rhs: ?*AstNode = null,
-    alt: ?*AstNode = null,
-    children: ?AST = null,
-    params: ?[][]const u8 = null,
-    value: []const u8 = "",
+pub const Param = struct {
+    name: *ASTNode,
+    type: *ASTNode,
 };
 
-pub const AstType = enum {
+pub const ASTNode = union(enum) {
+    Conditional: struct {
+        kind: ASTKind,
+        condition: *ASTNode,
+        result: *ASTNode,
+        alt: ?*ASTNode,
+    },
+
+    BinaryOp: struct {
+        kind: ASTKind,
+        lhs: *ASTNode,
+        rhs: *ASTNode,
+    },
+
+    PrefixOp: struct {
+        kind: ASTKind,
+        lhs: *ASTNode,
+    },
+
+    PostfixOp: struct {
+        kind: ASTKind,
+        lhs: *ASTNode,
+    },
+
+    Function: struct {
+        name: []const u8,
+        params: []Param,
+        sig: ASTKind,
+        body: *ASTNode,
+    },
+
+    Call: struct {
+        callee: *ASTNode,
+        args: []*ASTNode,
+    },
+
+    Number: struct {
+        kind: numbers.NumberKind,
+        text: []const u8,
+    },
+
+    OptionalReturn: struct {
+        base: ASTKind,
+    },
+
+    Optional: *ASTNode,
+    Block: []*ASTNode,
+    Identifier: []const u8,
+    String: []const u8,
+
+    Keyword: ASTKind,
+};
+
+pub const ASTKind = enum {
     //====== Binary operators ======//
     // Maths
     Add, // LHS + RHS
@@ -42,55 +89,118 @@ pub const AstType = enum {
     LesserOrEqual, //LHS <= RHS
 
     // Assignment
-    Variable, // LHS := RHS
-    Constant, // LHS #= RHS
+    Reassign, // LHS = RHS
+    AssignVar, // LHS := RHS
+    AssignConst, // LHS #= RHS
     TypeCast, // LHS :: RHS
 
-    //====== Unary Operators ======//
+    //====== Prefix Operators ======//
     Not, // !LHS
-    Increment, // ++LHS
-    Decrement, // --LHS
+    Negate, // -LHS
     TypeOf, // ::LHS
     BNot, // .!LHS
+
+    //====== Postfix Operators ======//
+    Increment, // LHS++
+    Decrement, // LHS--
+
+    //====== Conditionals ======//
+    If, // if CONDITION RESULT ALT
+    While, // while CONDITION RESULT
+    For, // for CONDITION RESULT
 
     //====== Keywords ======//
     Return, // return LHS
     ExitCode, // exit <- LHS
-    If, // if LHS RHS ALT
-    Else, // else LHS
-    While, // while LHS RHS
-    For, // for LHS RHS
+    Nil, // nil
     True, // true
     False, // false
 
     //====== Other ======//
-    Root, // FILE
     Function, // fn Id(Id T) RHS
-    ReturnSig, // [-~!?]> LHS RHS
-    Block, // {...}
+    // ReturnSig, // [-~!?]> LHS RHS
+    DirectRet, // ->
+    ErrorRet, // !>
+    // Block, // {...}
     Call, // f(x)
 };
 
 pub const AST = struct {
-    nodes: []AstNode,
-    _index: u8 = 0,
+    nodes: []*ASTNode,
+    _index: usize = 0,
 
-    pub fn next(self: *AST) AstNode {
+    pub fn next(self: *AST) ?*ASTNode {
         const index = self._index;
         self._index += 1;
-        return self.nodes[index];
+        return &self.nodes[index];
     }
 };
 
 pub const Token = struct {
     kind: TokKind = .EOF,
+    number_kind: ?numbers.NumberKind = null,
     value: []const u8 = "",
     line_num: usize = 0,
     line_col: usize = 0,
     line_col_end: usize = 0,
+
+    pub fn kindToChar(self: Token) []const u8 {
+        return switch (self.kind) {
+            .Plus => "+",
+            .Dash => "-",
+            .FSlash => "/",
+            .Star => "*",
+            .Percent => "%",
+            .Caret => "^",
+            .Pipe => "|",
+            .And => "&",
+            .Equals => "=",
+            .Dollar => "$",
+            .Underscore => "_",
+            .BSlash => "\\",
+            .Comma => ",",
+            .Period => ".",
+            .Question => "?",
+            .Bang => "!",
+            .At => "@",
+            .Hash => "#",
+            .Tilde => "~",
+            .Colon => ":",
+            .Backtick => "`",
+            .SingleQuote => "'",
+            .DoubleQuote => "\"",
+            .LBracket => "(",
+            .RBracket => ")",
+            .LSquare => "[",
+            .RSquare => "]",
+            .LBrace => "{",
+            .RBrace => "}",
+            .LAngle => "<",
+            .RAngle => ">",
+            .BAnd => ".&",
+            .BOr => ".|",
+            .BXor => ".^",
+            .BLeft => ".<",
+            .BRight => ".>",
+            .BNot => ".!",
+            .String => "String",
+            .Word => "Word",
+            .Number => {
+                return switch (self.number_kind.?) {
+                    .DecimalInt => "Decimal Integer",
+                    .DecimalFloat => "Decimal Float",
+                    .HexInt => "Hexadecimal Integer",
+                    .HexFloat => "Hexadecimal Float",
+                    .BinaryInt => "Binary Integer",
+                    .BinaryFloat => "Binary Float",
+                };
+            },
+            else => "\u{FFFD}",
+        };
+    }
 };
 
-pub const TokKind = enum {
+pub const TokKind = union(enum) {
     //====== Symbols ======//
     Plus, // +
     Dash, // -
@@ -134,17 +244,10 @@ pub const TokKind = enum {
     BRight, // .>
     BNot, // .!
 
-    //====== Numbers ======//
-    DecimalInt, // `0-9`
-    DecimalFloat, // `0-9.`
-    HexInt, // `0x0-F`
-    HexFloat, // `0x0-F.`
-    BinaryInt, // `0b0-1`
-    BinaryFloat, // `0b0-1.`
-
     //====== Other ======//
     EOF, // End of file
     Word, // `a-zA-Z`
+    Number, // numbers.NumberKind
     String, // "..."
 
     pub fn charToKind(char: u8) ?TokKind {
@@ -183,66 +286,15 @@ pub const TokKind = enum {
             else => null,
         };
     }
-
-    pub fn kindToChar(char: TokKind) []const u8 {
-        return switch (char) {
-            .Plus => "+",
-            .Dash => "-",
-            .FSlash => "/",
-            .Star => "*",
-            .Percent => "%",
-            .Caret => "^",
-            .Pipe => "|",
-            .And => "&",
-            .Equals => "=",
-            .Dollar => "$",
-            .Underscore => "_",
-            .BSlash => "\\",
-            .Comma => ",",
-            .Period => ".",
-            .Question => "?",
-            .Bang => "!",
-            .At => "@",
-            .Hash => "#",
-            .Tilde => "~",
-            .Colon => ":",
-            .Backtick => "`",
-            .SingleQuote => "'",
-            .DoubleQuote => "\"",
-            .LBracket => "(",
-            .RBracket => ")",
-            .LSquare => "[",
-            .RSquare => "]",
-            .LBrace => "{",
-            .RBrace => "}",
-            .LAngle => "<",
-            .RAngle => ">",
-            .BAnd => ".&",
-            .BOr => ".|",
-            .BXor => ".^",
-            .BLeft => ".<",
-            .BRight => ".>",
-            .BNot => ".!",
-            .String => "String",
-            .Word => "Word",
-            .DecimalInt => "Decimal Integer",
-            .DecimalFloat => "Decimal Float",
-            .HexInt => "Hexadecimal Integer",
-            .HexFloat => "Hexadecimal Float",
-            .BinaryInt => "Binary Integer",
-            .BinaryFloat => "Binary Float",
-            else => "\u{FFFD}",
-        };
-    }
 };
 
 pub const TokenIterator = struct {
     tokens: []Token,
-    index: u8 = 0,
+    index: usize = 0,
 
-    pub fn next(self: *TokenIterator) ?Token {
+    pub fn next(self: *TokenIterator) ?*Token {
         const index = self.index;
         self.index += 1;
-        return self.tokens[index];
+        return &self.tokens[index];
     }
 };
