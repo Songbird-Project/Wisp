@@ -84,7 +84,6 @@ pub const AST = struct {
 
 pub const Token = struct {
     kind: TokKind = .EOF,
-    num_kind: ?numbers.NumberKind = .DecimalInt,
     value: []const u8 = "",
     line_num: usize = 0,
     line_col: usize = 0,
@@ -135,10 +134,17 @@ pub const TokKind = enum {
     BRight, // .>
     BNot, // .!
 
+    //====== Numbers ======//
+    DecimalInt, // `0-9`
+    DecimalFloat, // `0-9.`
+    HexInt, // `0x0-F`
+    HexFloat, // `0x0-F.`
+    BinaryInt, // `0b0-1`
+    BinaryFloat, // `0b0-1.`
+
     //====== Other ======//
     EOF, // End of file
-    Number, // Consecutive `0-9`
-    Word, // Consecutive `a-zA-Z`
+    Word, // `a-zA-Z`
     String, // "..."
 
     pub fn charToKind(char: u8) ?TokKind {
@@ -217,6 +223,14 @@ pub const TokKind = enum {
             .BLeft => ".<",
             .BRight => ".>",
             .BNot => ".!",
+            .String => "String",
+            .Word => "Word",
+            .DecimalInt => "Decimal Integer",
+            .DecimalFloat => "Decimal Float",
+            .HexInt => "Hexadecimal Integer",
+            .HexFloat => "Hexadecimal Float",
+            .BinaryInt => "Binary Integer",
+            .BinaryFloat => "Binary Float",
             else => "\u{FFFD}",
         };
     }

@@ -31,9 +31,8 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
                     .line_col_end = col,
                 };
             } else if (std.ascii.isDigit(char)) {
-                token.kind = .Number;
+                var kind: types.TokKind = .DecimalInt;
 
-                var num_kind: numbers.NumberKind = .DecimalInt;
                 const start = col;
                 while (col < line.len) : (col += 1) {
                     if (std.ascii.isWhitespace(line[col])) break;
@@ -50,19 +49,19 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
 
                     if (col == start + 1 and line[start] == '0') {
                         switch (line[col]) {
-                            'x' => num_kind = .HexInt,
-                            'b' => num_kind = .BinaryInt,
+                            'x' => kind = .HexInt,
+                            'b' => kind = .BinaryInt,
                             else => {},
                         }
 
                         continue;
                     }
 
-                    if (num_kind == .DecimalInt and numbers.char_kind[line[col]].decimal_point) num_kind = .DecimalFloat;
-                    if (num_kind == .HexInt and numbers.char_kind[line[col]].decimal_point) num_kind = .HexFloat;
-                    if (num_kind == .BinaryInt and numbers.char_kind[line[col]].decimal_point) num_kind = .BinaryFloat;
+                    if (kind == .DecimalInt and numbers.char_kind[line[col]].decimal_point) kind = .DecimalFloat;
+                    if (kind == .HexInt and numbers.char_kind[line[col]].decimal_point) kind = .HexFloat;
+                    if (kind == .BinaryInt and numbers.char_kind[line[col]].decimal_point) kind = .BinaryFloat;
 
-                    if (!numbers.validChar(num_kind, line[col])) return .{
+                    if (!numbers.validChar(kind, line[col])) return .{
                         .err = .{ .message = try errors.format(
                             alloc,
                             "invalid character in number",
@@ -94,6 +93,7 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
 
                 col -= 1;
                 token = .{
+                    .kind = kind,
                     .value = line[start .. col + 1],
                     .line_num = line_num,
                     .line_col = start,

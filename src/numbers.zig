@@ -1,13 +1,5 @@
 const std = @import("std");
-
-pub const NumberKind = enum {
-    DecimalInt,
-    DecimalFloat,
-    HexInt,
-    HexFloat,
-    BinaryInt,
-    BinaryFloat,
-};
+const types = @import("types.zig");
 
 pub const CharKind = struct {
     decimal_digit: bool,
@@ -36,46 +28,47 @@ pub const char_kind: [256]CharKind = kinds: {
         };
     }
 
-    //====== digits ======//
+    //====== Digits ======//
     for ('0'..'9' + 1) |char| {
         table[char].decimal_digit = true;
         table[char].hex_digit = true;
         table[char].binary_digit = char == '0' or char == '1';
     }
 
-    //====== hex ======//
+    //====== Hex ======//
     for ('a'..'f' + 1) |char| table[char].hex_digit = true;
     for ('A'..'F' + 1) |char| table[char].hex_digit = true;
 
-    //====== decimal point ======//
+    //====== Decimal Point ======//
     table['.'].decimal_point = true;
 
-    //====== exponents ======//
+    //====== Exponents ======//
     table['e'].decimal_exp = true;
     table['E'].decimal_exp = true;
     table['p'].binary_exp = true;
     table['P'].binary_exp = true;
 
-    //====== signs ======//
+    //====== Signs ======//
     table['+'].sign = true;
     table['-'].sign = true;
 
-    //====== other ======//
+    //====== Other ======//
     table['_'].underscore = true;
 
     break :kinds table;
 };
 
-pub fn validChar(kind: NumberKind, char: u8) bool {
+pub fn validChar(kind: types.TokKind, char: u8) bool {
     const class = char_kind[char];
 
     return switch (kind) {
         .DecimalInt => class.decimal_digit or class.underscore,
-        .DecimalFloat => class.decimal_digit or class.decimal_point or class.decimal_exp or class.sign or class.underscore,
+        .DecimalFloat => class.decimal_digit or class.decimal_point or class.sign or class.underscore,
         .HexInt => class.hex_digit or class.underscore,
-        .HexFloat => class.hex_digit or class.decimal_point or class.binary_exp or class.sign or class.underscore,
+        .HexFloat => class.hex_digit or class.decimal_point or class.sign or class.underscore,
         .BinaryInt => class.binary_digit or class.underscore,
-        .BinaryFloat => class.binary_digit or class.decimal_point or class.binary_exp or class.sign or class.underscore,
+        .BinaryFloat => class.binary_digit or class.decimal_point or class.sign or class.underscore,
+        else => false,
     };
 }
 
