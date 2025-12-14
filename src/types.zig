@@ -127,10 +127,19 @@ pub const TokKind = enum {
     LAngle, // <
     RAngle, // >
 
+    //====== Bitwise ======//
+    BAnd, // .&
+    BOr, // .|
+    BXor, // .^
+    BLeft, // .<
+    BRight, // .>
+    BNot, // .!
+
     //====== Other ======//
     EOF, // End of file
     Number, // Consecutive `0-9`
     Word, // Consecutive `a-zA-Z`
+    String, // "..."
 
     pub fn charToKind(char: u8) ?TokKind {
         return switch (char) {
@@ -156,7 +165,7 @@ pub const TokKind = enum {
             ':' => .Colon,
             '`' => .Backtick,
             '\'' => .SingleQuote,
-            '"' => .DoubleQuote,
+            '\"' => .DoubleQuote,
             '(' => .LBracket,
             ')' => .RBracket,
             '[' => .LSquare,
@@ -202,6 +211,12 @@ pub const TokKind = enum {
             .RBrace => "}",
             .LAngle => "<",
             .RAngle => ">",
+            .BAnd => ".&",
+            .BOr => ".|",
+            .BXor => ".^",
+            .BLeft => ".<",
+            .BRight => ".>",
+            .BNot => ".!",
             else => "\u{FFFD}",
         };
     }
