@@ -1,7 +1,8 @@
 const std = @import("std");
+const numbers = @import("numbers.zig");
 
 pub const AstNode = struct {
-    kind: AstType = AstType.Root,
+    kind: AstType = .Root,
 
     lhs: ?*AstNode = null,
     rhs: ?*AstNode = null,
@@ -52,14 +53,6 @@ pub const AstType = enum {
     TypeOf, // ::LHS
     BNot, // .!LHS
 
-    //====== Values ======//
-    Int, // 32
-    Float, // 32.45
-    Binary, // 0b101
-    Hex, // 0xF3
-    String, // "..."
-    Id, // name
-
     //====== Keywords ======//
     Return, // return LHS
     ExitCode, // exit <- LHS
@@ -90,7 +83,8 @@ pub const AST = struct {
 };
 
 pub const Token = struct {
-    kind: TokKind = TokKind.EOF,
+    kind: TokKind = .EOF,
+    num_kind: ?numbers.NumberKind = .DecimalInt,
     value: []const u8 = "",
     line_num: usize = 0,
     line_col: usize = 0,
@@ -136,8 +130,6 @@ pub const TokKind = enum {
     //====== Other ======//
     EOF, // End of file
     Number, // Consecutive `0-9`
-    Hex, // 0x0-9
-    Binary, // 0b0-9
     Word, // Consecutive `a-zA-Z`
 
     pub fn charToKind(char: u8) ?TokKind {
