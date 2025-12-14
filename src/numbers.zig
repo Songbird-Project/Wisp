@@ -1,5 +1,13 @@
 const std = @import("std");
-const types = @import("types.zig");
+
+pub const NumberKind = enum {
+    DecimalInt, // `0-9`
+    DecimalFloat, // `0-9.`
+    HexInt, // `0x0-F`
+    HexFloat, // `0x0-F.`
+    BinaryInt, // `0b0-1`
+    BinaryFloat, // `0b0-1.`
+};
 
 pub const CharKind = struct {
     decimal_digit: bool,
@@ -58,7 +66,7 @@ pub const char_kind: [256]CharKind = kinds: {
     break :kinds table;
 };
 
-pub fn validChar(kind: types.TokKind, char: u8) bool {
+pub fn validChar(kind: NumberKind, char: u8) bool {
     const class = char_kind[char];
 
     return switch (kind) {
@@ -68,7 +76,6 @@ pub fn validChar(kind: types.TokKind, char: u8) bool {
         .HexFloat => class.hex_digit or class.decimal_point or class.sign or class.underscore,
         .BinaryInt => class.binary_digit or class.underscore,
         .BinaryFloat => class.binary_digit or class.decimal_point or class.sign or class.underscore,
-        else => false,
     };
 }
 

@@ -31,7 +31,7 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
                     .line_col_end = col,
                 };
             } else if (std.ascii.isDigit(char)) {
-                var kind: types.TokKind = .DecimalInt;
+                var kind: numbers.NumberKind = .DecimalInt;
 
                 const start = col;
                 while (col < line.len) : (col += 1) {
@@ -93,7 +93,8 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
 
                 col -= 1;
                 token = .{
-                    .kind = kind,
+                    .kind = .Number,
+                    .number_kind = kind,
                     .value = line[start .. col + 1],
                     .line_num = line_num,
                     .line_col = start,
