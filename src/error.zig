@@ -17,7 +17,7 @@ pub fn format(
     text: []const u8,
     filename: []const u8,
     context: []const u8,
-    symbol: []const u8,
+    symbol: ?[]const u8,
     line: usize,
     col_start: usize,
     col_end: usize,
@@ -31,15 +31,23 @@ pub fn format(
             col_end + 1,
         });
     }
+
+    var symb: []u8 = undefined;
+    if (symbol != null) {
+        symb = try std.fmt.allocPrint(alloc, "`{s}`", .{symbol.?});
+    } else {
+        symb = "";
+    }
+
     const message_line: []u8 = try std.fmt.allocPrint(
         alloc,
-        "{s}: {s}:{d}:{s} `{s}`",
+        "{s}: {s}:{d}:{s} {s}",
         .{
             text,
             filename,
             line + 1,
             columns,
-            symbol,
+            symb,
         },
     );
 
