@@ -107,7 +107,7 @@ pub const TokKind = enum {
     Comma, // ,
     Period, // .
     Question, // ?
-    Exclamation, // !
+    Bang, // !
     At, // @
     Hash, // #
     Tilde, // ~
@@ -164,7 +164,7 @@ pub const TokKind = enum {
             ',' => .Comma,
             '.' => .Period,
             '?' => .Question,
-            '!' => .Exclamation,
+            '!' => .Bang,
             '@' => .At,
             '#' => .Hash,
             '~' => .Tilde,
@@ -201,7 +201,7 @@ pub const TokKind = enum {
             .Comma => ",",
             .Period => ".",
             .Question => "?",
-            .Exclamation => "!",
+            .Bang => "!",
             .At => "@",
             .Hash => "#",
             .Tilde => "~",
