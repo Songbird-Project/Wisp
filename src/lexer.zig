@@ -24,12 +24,75 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
                     .line_col_end = col,
                 };
             } else if (std.ascii.isDigit(char)) {
+                token.kind = .Number;
+
                 const start = col;
-                while (col < line.len and std.ascii.isDigit(line[col])) : (col += 1) {}
+                while (col < line.len) : (col += 1) {
+                    switch (token.kind) {
+                        .Number => {
+                            if (line[col] == 'x' and col == start + 1 and line[start] == '0') {
+                                token.kind = .Hex;
+                                continue;
+                            } else if (line[col] == 'b' and col == start + 1 and line[start] == '0') {
+                                token.kind = .Binary;
+                                continue;
+                            } else if (line[col] == '.') {
+                                token.kind = .Float;
+                            }
+
+                            if (!std.ascii.isDigit(line[col]) and line[col] != '_') {
+                                return .{
+                                    .err = .{ .message = try errors.format(
+                                        alloc,
+                                        "unexpected character in number",
+                                        filename,
+                                        line,
+                                        line[col .. col + 1],
+                                        line_num,
+                                        col,
+                                        col,
+                                    ), .code = 1 },
+                                };
+                            }
+                        },
+                        .Hex => {
+                            if (!std.ascii.isHex(line[col]) and line[col] != '_') {
+                                return .{
+                                    .err = .{ .message = try errors.format(
+                                        alloc,
+                                        "unexpected character in hexadecimal",
+                                        filename,
+                                        line,
+                                        line[col .. col + 1],
+                                        line_num,
+                                        col,
+                                        col,
+                                    ), .code = 1 },
+                                };
+                            }
+                        },
+                        .Binary => {
+                            if ((line[col] != '0' and line[col] != '1') and line[col] != '_') {
+                                return .{
+                                    .err = .{ .message = try errors.format(
+                                        alloc,
+                                        "unexpected character in binary",
+                                        filename,
+                                        line,
+                                        line[col .. col + 1],
+                                        line_num,
+                                        col,
+                                        col,
+                                    ), .code = 1 },
+                                };
+                            }
+                        },
+                        else => unreachable,
+                    }
+                }
 
                 col -= 1;
                 token = .{
-                    .kind = .Number,
                     .value = line[start .. col + 1],
                     .line_num = line_num,
                     .line_col = start,
