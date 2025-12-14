@@ -8,7 +8,7 @@ pub const AstNode = struct {
     alt: ?*AstNode = null,
     children: ?AST = null,
     params: ?[][]const u8 = null,
-    value: ?[]const u8 = null,
+    value: []const u8 = "",
 };
 
 pub const AstType = enum {
@@ -136,6 +136,8 @@ pub const TokKind = enum {
     //====== Other ======//
     EOF, // End of file
     Number, // Consecutive `0-9`
+    Hex, // 0x0-9
+    Binary, // 0b0-9
     Word, // Consecutive `a-zA-Z`
 
     pub fn charToKind(char: u8) ?TokKind {
@@ -215,11 +217,11 @@ pub const TokKind = enum {
 
 pub const TokenIterator = struct {
     tokens: []Token,
-    _index: u8 = 0,
+    index: u8 = 0,
 
     pub fn next(self: *TokenIterator) ?Token {
-        const index = self._index;
-        self._index += 1;
+        const index = self.index;
+        self.index += 1;
         return self.tokens[index];
     }
 };
