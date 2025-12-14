@@ -1,6 +1,7 @@
 const std = @import("std");
 const types = @import("./types.zig");
 const errors = @import("./error.zig");
+const numbers = @import("numbers.zig");
 
 pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !errors.Result(types.TokenIterator) {
     var token_list: std.ArrayList(types.Token) = .empty;
@@ -26,69 +27,41 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
             } else if (std.ascii.isDigit(char)) {
                 token.kind = .Number;
 
+                var num_kind: numbers.NumberKind = .DecimalInt;
                 const start = col;
                 while (col < line.len) : (col += 1) {
-                    switch (token.kind) {
-                        .Number => {
-                            if (line[col] == 'x' and col == start + 1 and line[start] == '0') {
-                                token.kind = .Hex;
-                                continue;
-                            } else if (line[col] == 'b' and col == start + 1 and line[start] == '0') {
-                                token.kind = .Binary;
-                                continue;
-                            } else if (line[col] == '.') {
-                                token.kind = .Float;
-                            }
+                    if (!numbers.validChar(num_kind, char)) return .{
+                        .err = .{ .message = try errors.format(
+                            alloc,
+                            "invalid character in number",
+                            filename,
+                            line,
+                            line[col .. col + 1],
+                            line_num,
+                            col,
+                            col,
+                        ), .code = 1 },
+                    };
 
-                            if (!std.ascii.isDigit(line[col]) and line[col] != '_') {
-                                return .{
-                                    .err = .{ .message = try errors.format(
-                                        alloc,
-                                        "unexpected character in number",
-                                        filename,
-                                        line,
-                                        line[col .. col + 1],
-                                        line_num,
-                                        col,
-                                        col,
-                                    ), .code = 1 },
-                                };
-                            }
-                        },
-                        .Hex => {
-                            if (!std.ascii.isHex(line[col]) and line[col] != '_') {
-                                return .{
-                                    .err = .{ .message = try errors.format(
-                                        alloc,
-                                        "unexpected character in hexadecimal",
-                                        filename,
-                                        line,
-                                        line[col .. col + 1],
-                                        line_num,
-                                        col,
-                                        col,
-                                    ), .code = 1 },
-                                };
-                            }
-                        },
-                        .Binary => {
-                            if ((line[col] != '0' and line[col] != '1') and line[col] != '_') {
-                                return .{
-                                    .err = .{ .message = try errors.format(
-                                        alloc,
-                                        "unexpected character in binary",
-                                        filename,
-                                        line,
-                                        line[col .. col + 1],
-                                        line_num,
-                                        col,
-                                        col,
-                                    ), .code = 1 },
-                                };
-                            }
-                        },
-                        else => unreachable,
-                    }
+                    if (num_kind == .DecimalInt and numbers.char_kind[char].decimal_point) num_kind = .DecimalFloat;
+                    if (num_kind == .HexInt and numbers.char_kind[char].decimal_point) num_kind = .HexFloat;
+                    if (num_kind == .BinaryInt and numbers.char_kind[char].decimal_point) num_kind = .BinaryFloat;
+                }
+
+                const underscore_error = numbers.validateUnderscores(line, start, col);
+                if (underscore_error.len > 0) {
+                    return .{
+                        .err = .{ .message = try errors.format(
+                            alloc,
+                            underscore_error,
+                            filename,
+                            line,
+                            line[col .. col + 1],
+                            line_num,
+                            col,
+                            col,
+                        ), .code = 1 },
+                    };
                 }
 
                 col -= 1;
