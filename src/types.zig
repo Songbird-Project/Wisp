@@ -2,7 +2,7 @@ const std = @import("std");
 const numbers = @import("numbers.zig");
 
 pub const Param = struct {
-    name: *ASTNode,
+    name: []const u8,
     type: *ASTNode,
 };
 
@@ -47,9 +47,20 @@ pub const ASTNode = union(enum) {
         text: []const u8,
     },
 
-    OptionalReturn: struct {
-        base: ASTKind,
+    Exit: struct {
+        immediate: bool,
+        text: ?*ASTNode,
     },
+
+    ReturnSig: struct {
+        can_error: bool,
+        optional: bool,
+        return_type: *ASTNode,
+    },
+
+    Return: ?*ASTNode,
+    Bool: bool,
+    Nil,
 
     Optional: *ASTNode,
     Block: []*ASTNode,
@@ -104,34 +115,21 @@ pub const ASTKind = enum {
     Increment, // LHS++
     Decrement, // LHS--
 
-    //====== Conditionals ======//
-    If, // if CONDITION RESULT ALT
-    While, // while CONDITION RESULT
-    For, // for CONDITION RESULT
-
-    //====== Keywords ======//
-    Return, // return LHS
-    ExitCode, // exit <- LHS
-    Nil, // nil
-    True, // true
-    False, // false
-
     //====== Other ======//
     Function, // fn Id(Id T) RHS
-    // ReturnSig, // [-~!?]> LHS RHS
     DirectRet, // ->
     ErrorRet, // !>
-    // Block, // {...}
     Call, // f(x)
 };
 
 pub const AST = struct {
-    nodes: []*ASTNode,
-    _index: usize = 0,
+    nodes: []ASTNode,
+    index: usize = 0,
 
     pub fn next(self: *AST) ?*ASTNode {
-        const index = self._index;
-        self._index += 1;
+        if (self.index >= self.nodes.len) return null;
+        const index = self.index;
+        self.index += 1;
         return &self.nodes[index];
     }
 };
@@ -183,24 +181,42 @@ pub const Token = struct {
             .BLeft => ".<",
             .BRight => ".>",
             .BNot => ".!",
+            .RArrow => "->",
+            .RErrorArrow => "!>",
+            .LArrow => "<-",
+            .LErrorArrow => "<!",
+            .ROptionalArrow => "?->",
+            .ROptionalErrorArrow => "?!>",
+            .LOptionalArrow => "?<-",
+            .LOptionalErrorArrow => "?<!",
+            .ColonColon => "::",
+            .DashDash => "--",
+            .PlusPlus => "++",
+            .LessOrEqual => "<=",
+            .GreaterOrEqual => ">=",
+            .EqualEqual => "==",
             .String => "String",
             .Word => "Word",
             .Number => {
-                return switch (self.number_kind.?) {
-                    .DecimalInt => "Decimal Integer",
-                    .DecimalFloat => "Decimal Float",
-                    .HexInt => "Hexadecimal Integer",
-                    .HexFloat => "Hexadecimal Float",
-                    .BinaryInt => "Binary Integer",
-                    .BinaryFloat => "Binary Float",
-                };
+                if (self.number_kind) |kind| {
+                    return switch (kind) {
+                        .DecimalInt => "Decimal Integer",
+                        .DecimalFloat => "Decimal Float",
+                        .HexInt => "Hexadecimal Integer",
+                        .HexFloat => "Hexadecimal Float",
+                        .BinaryInt => "Binary Integer",
+                        .BinaryFloat => "Binary Float",
+                    };
+                } else {
+                    return "Number";
+                }
             },
             else => "\u{FFFD}",
         };
     }
 };
 
-pub const TokKind = union(enum) {
+pub const TokKind = enum {
     //====== Symbols ======//
     Plus, // +
     Dash, // -
@@ -222,6 +238,9 @@ pub const TokKind = union(enum) {
     Hash, // #
     Tilde, // ~
     Colon, // :
+    ColonColon, // ::
+    DashDash, // --
+    PlusPlus, // ++
 
     Backtick, // `
     SingleQuote, // '
@@ -243,6 +262,21 @@ pub const TokKind = union(enum) {
     BLeft, // .<
     BRight, // .>
     BNot, // .!
+
+    //====== Arrows ======//
+    RArrow, // ->
+    RErrorArrow, // !>
+    LArrow, // <-
+    LErrorArrow, // <!
+    ROptionalArrow, // ?->
+    ROptionalErrorArrow, // ?!>
+    LOptionalArrow, // ?<-
+    LOptionalErrorArrow, // ?<!
+
+    //====== Inequality ======//
+    LessOrEqual, // <=
+    GreaterOrEqual, // >=
+    EqualEqual, // ==
 
     //====== Other ======//
     EOF, // End of file
@@ -293,6 +327,7 @@ pub const TokenIterator = struct {
     index: usize = 0,
 
     pub fn next(self: *TokenIterator) ?*Token {
+        if (self.index >= self.tokens.len) return null;
         const index = self.index;
         self.index += 1;
         return &self.tokens[index];
