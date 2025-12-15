@@ -62,7 +62,7 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
                     if (kind == .BinaryInt and numbers.char_kind[line[col]].decimal_point) kind = .BinaryFloat;
 
                     if (!numbers.validChar(kind, line[col])) {
-                        if (std.ascii.isAlphabetic(line[col])) {
+                        if (std.ascii.isAlphanumeric(line[col])) {
                             return .{
                                 .err = .{ .message = try errors.format(
                                     alloc,
