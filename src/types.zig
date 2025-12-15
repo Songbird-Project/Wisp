@@ -277,6 +277,11 @@ pub const TokKind = enum {
     LessOrEqual, // <=
     GreaterOrEqual, // >=
     EqualEqual, // ==
+    BangEqual, // !=
+
+    //====== Assignment ======//
+    ColonEqual, // :=
+    HashEqual, // #=
 
     //====== Other ======//
     EOF, // End of file
