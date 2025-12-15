@@ -83,9 +83,9 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
                             underscore_error,
                             filename,
                             line,
-                            line[col .. col + 1],
+                            null,
                             line_num,
-                            col,
+                            start,
                             col,
                         ), .code = 1 },
                     };
@@ -141,6 +141,7 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
                 };
             } else if (char == '.') {
                 var kind: types.TokKind = .BAnd;
+                const start = col;
 
                 if (col + 1 < line.len) {
                     switch (line[col + 1]) {
@@ -156,21 +157,80 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
                                 "unrecognized bitwise operator",
                                 filename,
                                 line,
-                                line[col .. col + 2],
+                                line[start .. col + 2],
                                 line_num,
-                                col,
+                                start,
                                 col + 2,
                             ), .code = 1 },
                         },
+                    }
+                }
+
+                col += 2;
+                token = .{
+                    .kind = kind,
+                    .value = line[start..col],
+                    .line_num = line_num,
+                    .line_col = start,
+                    .line_col_end = col,
+                };
+            } else if (char == '?') {
+                var kind: types.TokKind = .Question;
+                const start = col;
+                var len: usize = 0;
+
+                if (col + 1 < line.len) {
+                    var message: ?[]const u8 = null;
+
+                    if (std.ascii.isAlphabetic(line[col + 1]) or line[col + 1] == '_') {
+                        kind = .Question;
+                    } else if (col + 2 < line.len and !std.ascii.isWhitespace(line[col + 1]) and !std.ascii.isWhitespace(line[col + 2])) {
+                        len = 3;
+
+                        if (std.mem.eql(u8, line[col + 1 .. col + 3], "<-")) {
+                            kind = .LOptionalArrow;
+                        } else if (std.mem.eql(u8, line[col + 1 .. col + 3], "<!")) {
+                            kind = .LOptionalErrorArrow;
+                        } else if (std.mem.eql(u8, line[col + 1 .. col + 3], "->")) {
+                            kind = .ROptionalArrow;
+                        } else if (std.mem.eql(u8, line[col + 1 .. col + 3], "!>")) {
+                            kind = .ROptionalErrorArrow;
+                        } else message = "unrecognized arrow operator";
+                    } else return .{
+                        .err = .{ .message = try errors.format(
+                            alloc,
+                            "unrecognized use of optional operator",
+                            filename,
+                            line,
+                            null,
+                            line_num,
+                            col,
+                            col,
+                        ), .code = 1 },
+                    };
+
+                    if (message != null) {
+                        return .{
+                            .err = .{ .message = try errors.format(
+                                alloc,
+                                message.?,
+                                filename,
+                                line,
+                                line[start .. col + 3],
+                                line_num,
+                                start,
+                                col + 2,
+                            ), .code = 1 },
+                        };
                     }
                 } else {
                     return .{
                         .err = .{ .message = try errors.format(
                             alloc,
-                            "expected second symbol after bitwise initializer",
+                            "expected expression or arrow after `?`",
                             filename,
                             line,
-                            line[col .. col + 1],
+                            null,
                             line_num,
                             col,
                             col,
@@ -178,12 +238,175 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
                     };
                 }
 
+                col += len;
                 token = .{
                     .kind = kind,
-                    .value = line[col .. col + 2],
+                    .value = line[start..col],
+                    .line_num = line_num,
+                    .line_col = start,
+                    .line_col_end = col + 2,
+                };
+            } else if (char == '<') {
+                var kind: types.TokKind = undefined;
+                const start = col;
+
+                if (col + 1 < line.len) {
+                    if (line[col + 1] == '-') {
+                        kind = .LArrow;
+                    } else if (line[col + 1] == '!') {
+                        kind = .LErrorArrow;
+                    } else if (line[col + 1] == '=') {
+                        kind = .LessOrEqual;
+                    } else continue;
+                } else {
+                    return .{
+                        .err = .{ .message = try errors.format(
+                            alloc,
+                            "expected expression or arrow tail after `<`",
+                            filename,
+                            line,
+                            null,
+                            line_num,
+                            col,
+                            col,
+                        ), .code = 1 },
+                    };
+                }
+
+                col += 2;
+                token = .{
+                    .kind = kind,
+                    .value = line[start..col],
+                    .line_num = line_num,
+                    .line_col = start,
+                    .line_col_end = col + 2,
+                };
+            } else if (char == '>') {
+                var kind: types.TokKind = undefined;
+                const start = col;
+
+                if (col + 1 < line.len) {
+                    if (line[col + 1] == '=') {
+                        kind = .GreaterOrEqual;
+                    } else continue;
+                } else {
+                    return .{
+                        .err = .{ .message = try errors.format(
+                            alloc,
+                            "expected expression or `=` after `>`",
+                            filename,
+                            line,
+                            null,
+                            line_num,
+                            col,
+                            col,
+                        ), .code = 1 },
+                    };
+                }
+
+                col += 2;
+                token = .{
+                    .kind = kind,
+                    .value = line[start..col],
+                    .line_num = line_num,
+                    .line_col = start,
+                    .line_col_end = col + 2,
+                };
+            } else if (char == '=') {
+                var kind: types.TokKind = undefined;
+                const start = col;
+
+                if (col + 1 < line.len) {
+                    if (line[col + 1] == '=') {
+                        kind = .EqualEqual;
+                    } else continue;
+                } else {
+                    return .{
+                        .err = .{ .message = try errors.format(
+                            alloc,
+                            "expected expression or `=` after `>`",
+                            filename,
+                            line,
+                            null,
+                            line_num,
+                            col,
+                            col,
+                        ), .code = 1 },
+                    };
+                }
+
+                col += 2;
+                token = .{
+                    .kind = kind,
+                    .value = line[start..col],
+                    .line_num = line_num,
+                    .line_col = start,
+                    .line_col_end = col + 2,
+                };
+            } else if (char == '-') {
+                var kind: types.TokKind = undefined;
+                const start = col;
+
+                if (col + 1 < line.len) {
+                    if (line[col + 1] == '>') {
+                        kind = .RArrow;
+                    }
+                    if (line[col + 1] == '-') {
+                        kind = .DashDash;
+                    } else continue;
+                } else {
+                    return .{
+                        .err = .{ .message = try errors.format(
+                            alloc,
+                            "expected expression or arrow head after `-`",
+                            filename,
+                            line,
+                            null,
+                            line_num,
+                            col,
+                            col,
+                        ), .code = 1 },
+                    };
+                }
+
+                col += 2;
+                token = .{
+                    .kind = kind,
+                    .value = line[start..col],
+                    .line_num = line_num,
+                    .line_col = start,
+                    .line_col_end = col + 2,
+                };
+            } else if (char == '!') {
+                var kind: types.TokKind = undefined;
+                const start = col;
+
+                if (col + 1 < line.len) {
+                    if (line[col + 1] == '>') {
+                        kind = .RErrorArrow;
+                    } else continue;
+                } else {
+                    return .{
+                        .err = .{ .message = try errors.format(
+                            alloc,
+                            "expected expression or arrow head after `!`",
+                            filename,
+                            line,
+                            null,
+                            line_num,
+                            col,
+                            col,
+                        ), .code = 1 },
+                    };
+                }
+
+                col += 2;
+                token = .{
+                    .kind = kind,
+                    .value = line[start..col],
                     .line_num = line_num,
                     .line_col = col,
-                    .line_col_end = col + 1,
+                    .line_col_end = col + 2,
                 };
             } else if (types.TokKind.charToKind(char)) |kind| {
                 token = .{
