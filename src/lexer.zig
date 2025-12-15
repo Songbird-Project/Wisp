@@ -37,7 +37,7 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
                 while (col < line.len) : (col += 1) {
                     if (std.ascii.isWhitespace(line[col])) break;
                     switch (line[col]) {
-                        '+', '-', '*', '/', '%', '&', '|', '^', '<', '>', '!' => break,
+                        '+', '-', '*', '/', '%', '&', '|', '^', '<', '>', '!', '}', ']', ')' => break,
                         '.' => if (col + 1 < line.len) {
                             switch (line[col + 1]) {
                                 '&', '|', '^', '<', '>', '!' => break,
@@ -61,18 +61,22 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
                     if (kind == .HexInt and numbers.char_kind[line[col]].decimal_point) kind = .HexFloat;
                     if (kind == .BinaryInt and numbers.char_kind[line[col]].decimal_point) kind = .BinaryFloat;
 
-                    if (!numbers.validChar(kind, line[col])) return .{
-                        .err = .{ .message = try errors.format(
-                            alloc,
-                            "invalid character in number",
-                            filename,
-                            line,
-                            line[col .. col + 1],
-                            line_num,
-                            col,
-                            col,
-                        ), .code = 1 },
-                    };
+                    if (!numbers.validChar(kind, line[col])) {
+                        if (std.ascii.isAlphabetic(line[col])) {
+                            return .{
+                                .err = .{ .message = try errors.format(
+                                    alloc,
+                                    "invalid character in number",
+                                    filename,
+                                    line,
+                                    line[col .. col + 1],
+                                    line_num,
+                                    col,
+                                    col,
+                                ), .code = 1 },
+                            };
+                        } else break;
+                    }
                 }
 
                 const underscore_error = numbers.validateUnderscores(line, start, col);
@@ -163,7 +167,7 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
                     .ok => {},
                 }
 
-                col += op.ok.length - 1;
+                col += op.ok.length;
                 token = .{
                     .kind = op.ok.kind,
                     .value = line[start .. col + 1],
@@ -219,7 +223,7 @@ fn parseOp(line: []const u8, col: usize) errors.Result(struct {
     length: usize,
 }) {
     const char = line[col];
-    var len: usize = 1;
+    var len: usize = 0;
     var message: ?[]const u8 = null;
     var kind: types.TokKind = types.TokKind.charToKind(char) orelse return .{ .err = .{
         .message = "unexpected character in file",
@@ -232,7 +236,7 @@ fn parseOp(line: []const u8, col: usize) errors.Result(struct {
         if (std.ascii.isAlphanumeric(line[col + 1]) or line[col + 1] == '_') {
             kind = .Question;
         } else if (col + 2 < line.len and !std.ascii.isWhitespace(line[col + 1]) and !std.ascii.isWhitespace(line[col + 2])) {
-            len = 3;
+            len = 2;
 
             if (std.mem.eql(u8, arrow, "<-")) {
                 kind = .LOptionalArrow;
@@ -244,11 +248,12 @@ fn parseOp(line: []const u8, col: usize) errors.Result(struct {
                 kind = .ROptionalErrorArrow;
             } else message = "unrecognized arrow operator";
         }
-    } else if (col + 1 < line.len and !std.ascii.isWhitespace(line[col + 1])) {
+    } else if (col + 1 < line.len) {
         const op = line[col .. col + 2];
-        len = 2;
 
         if (char == '.') {
+            len = 1;
+
             switch (line[col + 1]) {
                 '&' => kind = .BAnd,
                 '|' => kind = .BOr,
@@ -259,6 +264,8 @@ fn parseOp(line: []const u8, col: usize) errors.Result(struct {
                 else => message = "unrecognized bitwise operator",
             }
         } else if (line[col + 1] == '=') {
+            len = 1;
+
             switch (char) {
                 '<' => kind = .LessOrEqual,
                 '>' => kind = .GreaterOrEqual,
@@ -269,22 +276,29 @@ fn parseOp(line: []const u8, col: usize) errors.Result(struct {
                 else => {},
             }
         } else if (line[col + 1] == '>') {
+            len = 1;
+
             switch (char) {
                 '-' => kind = .RArrow,
                 '!' => kind = .RErrorArrow,
                 else => {},
             }
         } else if (char == '<') {
+            len = 1;
+
             switch (line[col + 1]) {
                 '-' => kind = .LArrow,
                 '!' => kind = .LErrorArrow,
                 else => {},
             }
         } else if (std.mem.eql(u8, op, "++")) {
+            len = 1;
             kind = .PlusPlus;
         } else if (std.mem.eql(u8, op, "--")) {
+            len = 1;
             kind = .DashDash;
         } else if (std.mem.eql(u8, op, "::")) {
+            len = 1;
             kind = .ColonColon;
         }
     }
