@@ -195,6 +195,9 @@ pub const Token = struct {
             .LessOrEqual => "<=",
             .GreaterOrEqual => ">=",
             .EqualEqual => "==",
+            .BangEqual => "!=",
+            .ColonEqual => ":=",
+            .HashEqual => "#=",
             .String => "String",
             .Word => "Word",
             .Number => {
