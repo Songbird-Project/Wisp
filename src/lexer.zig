@@ -24,7 +24,7 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
 
                 col -= 1;
                 token = .{
-                    .kind = .Word,
+                    .kind = .Id,
                     .value = line[start .. col + 1],
                     .line_num = line_num,
                     .line_col = start,
