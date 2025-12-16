@@ -195,8 +195,10 @@ fn parseExit(tokens: *types.TokenIterator) types.ParserReturn {
     var immediate_exit: bool = true;
     var exit_value: ?*types.ASTNode = null;
 
-    const arrow = tokens.next();
-    if (arrow != null) {
+    const arrow = tokens.peek(1);
+    if (arrow != null and arrow.?.kind != .Newline) {
+        _ = tokens.next();
+
         switch (arrow.?.kind) {
             .LErrorArrow => immediate_exit = true,
             .LArrow => immediate_exit = false,
