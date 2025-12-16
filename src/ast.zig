@@ -7,41 +7,52 @@ pub fn parse(alloc: std.mem.Allocator, filename: []const u8, src: [][]u8, tokens
     var nodes: std.ArrayList(types.ASTNode) = .empty;
 
     while (tokens.next()) |token| {
-        var node: types.ASTNode = .Nil;
+        var node: ?types.ASTNode = null;
 
-        if (token.kind == .Hash) {
-            const directiveNode = parseDirective(tokens);
-            if (directiveNode == .err) {
-                const err = directiveNode.err;
-                return .{
-                    .err = .{
-                        .message = try errors.format(
-                            alloc,
-                            err.message,
-                            filename,
-                            src[err.token.line_num],
-                            null,
-                            err.token.line_num,
-                            err.token.line_col,
-                            err.token.line_col_end,
-                        ),
-                        .code = err.code,
-                    },
-                };
-            }
+        switch (token.kind) {
+            .Hash => {
+                const directiveNode = parseDirective(tokens);
+                if (directiveNode == .err) {
+                    const err = directiveNode.err;
+                    return .{
+                        .err = .{
+                            .message = try errors.format(
+                                alloc,
+                                err.message,
+                                filename,
+                                src[err.token.line_num],
+                                null,
+                                err.token.line_num,
+                                err.token.line_col,
+                                err.token.line_col_end,
+                            ),
+                            .code = err.code,
+                        },
+                    };
+                }
 
-            node = directiveNode.ok;
-        } else if (token.kind == .Id) {
-            if (std.mem.eql(u8, token.value, "fn")) {
+                node = directiveNode.ok;
+            },
+            .Fn => {
                 // TODO: parseFn
-            } else {
+            },
+            .Return => {
+                // TODO: parseReturn
+            },
+            .Exit => {
+                // TODO: parseExit
+            },
+            .Id => {
                 if (tokens.peek(1).?.kind == .ColonColon) {
                     // TODO: parseTypeDef
                 } else if (isAssign(tokens.peek(1).?.kind)) {
                     // TODO: parseAssign
                 }
-            }
-        } else {
+            },
+            else => {},
+        }
+
+        if (node == null) {
             return .{
                 .err = .{
                     .message = try errors.format(
@@ -59,7 +70,7 @@ pub fn parse(alloc: std.mem.Allocator, filename: []const u8, src: [][]u8, tokens
             };
         }
 
-        try nodes.append(alloc, node);
+        try nodes.append(alloc, node.?);
     }
 
     return .{
