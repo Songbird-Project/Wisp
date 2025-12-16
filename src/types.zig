@@ -58,6 +58,13 @@ pub const ASTNode = union(enum) {
         return_type: *ASTNode,
     },
 
+    Import: struct {
+        is_relative: bool,
+        is_absolute: bool,
+        is_builtin: bool,
+        path: []const u8,
+    },
+
     Return: ?*ASTNode,
     Bool: bool,
     Nil,
@@ -339,5 +346,10 @@ pub const TokenIterator = struct {
         const index = self.index;
         self.index += 1;
         return &self.tokens[index];
+    }
+
+    pub fn peek(self: *TokenIterator, distance: usize) ?*Token {
+        if (self.index + distance >= self.tokens.len) return null;
+        return &self.tokens[self.index + distance];
     }
 };
