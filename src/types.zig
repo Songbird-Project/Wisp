@@ -223,6 +223,9 @@ pub const Token = struct {
             .HashEqual => "#=",
             .String => "String",
             .Id => "Identifier",
+            .Exit => "Keyword Exit",
+            .Return => "Keyword Return",
+            .Fn => "Keyword Function",
             .Number => {
                 if (self.number_kind) |kind| {
                     return switch (kind) {
@@ -267,6 +270,8 @@ pub const TokKind = enum {
     ColonColon, // ::
     DashDash, // --
     PlusPlus, // ++
+    ColonEqual, // :=
+    HashEqual, // #=
 
     Backtick, // `
     SingleQuote, // '
@@ -305,9 +310,10 @@ pub const TokKind = enum {
     EqualEqual, // ==
     BangEqual, // !=
 
-    //====== Assignment ======//
-    ColonEqual, // :=
-    HashEqual, // #=
+    //====== Keywords ======//
+    Exit, // exit
+    Return, // return
+    Fn, // fn
 
     //====== Other ======//
     Id, // `a-zA-Z`

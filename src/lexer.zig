@@ -23,8 +23,18 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
                 {}
 
                 col -= 1;
+
+                var kind: types.TokKind = .Id;
+                if (std.mem.eql(u8, line[start .. col + 1], "exit")) {
+                    kind = .Exit;
+                } else if (std.mem.eql(u8, line[start .. col + 1], "return")) {
+                    kind = .Return;
+                } else if (std.mem.eql(u8, line[start .. col + 1], "fn")) {
+                    kind = .Fn;
+                }
+
                 token = .{
-                    .kind = .Id,
+                    .kind = kind,
                     .value = line[start .. col + 1],
                     .line_num = line_num,
                     .line_col = start,
