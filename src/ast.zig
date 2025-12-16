@@ -6,7 +6,7 @@ const numbers = @import("numbers.zig");
 pub fn parse(alloc: std.mem.Allocator, filename: []const u8, src: [][]u8, tokens: *types.TokenIterator) !errors.Result(types.AST) {
     var nodes: std.ArrayList(types.ASTNode) = .empty;
 
-    while (tokens.next()) |token| {
+    while (tokens.peek(0)) |token| {
         var node: ?types.ASTNode = null;
 
         switch (token.kind) {
@@ -43,10 +43,18 @@ pub fn parse(alloc: std.mem.Allocator, filename: []const u8, src: [][]u8, tokens
                 // TODO: parseExit
             },
             .Id => {
-                if (tokens.peek(1).?.kind == .ColonColon) {
-                    // TODO: parseTypeDef
-                } else if (isAssign(tokens.peek(1).?.kind)) {
-                    // TODO: parseAssign
+                const id = tokens.peek(1) orelse break;
+                switch (id.kind) {
+                    .ColonColon => {
+                        // TODO: parseType
+                    },
+                    .Period => {
+                        // TODO: parseCall
+                    },
+                    .ColonEqual, .HashEqual, .Equals => {
+                        // TODO: parseAssign
+                    },
+                    else => {},
                 }
             },
             else => {},
@@ -80,33 +88,23 @@ pub fn parse(alloc: std.mem.Allocator, filename: []const u8, src: [][]u8, tokens
     };
 }
 
-fn parseDirective(tokens: *types.TokenIterator) union(enum) {
-    ok: types.ASTNode,
-    err: struct {
-        token: types.Token,
-        message: []const u8,
-        code: u8,
-    },
-} {
+fn parseDirective(tokens: *types.TokenIterator) types.ParserReturn {
     var node: types.ASTNode = undefined;
-    var err: usize = 1;
-    if (tokens.peek(1) != null) {
-        err = 2;
-    }
+
+    const hash = tokens.next().?;
 
     const name: ?*types.Token = tokens.expect(.Id);
     if (name == null) {
         return .{
             .err = .{
-                .token = tokens.tokens[tokens.index - err],
+                .token = hash.*,
                 .message = "expected directive name after `#`",
                 .code = 1,
             },
         };
     }
 
-    var token: ?*types.Token = tokens.expect(.LBracket);
-    if (token == null) {
+    if (tokens.expect(.LBracket) == null) {
         return .{
             .err = .{
                 .token = tokens.tokens[tokens.index - 1],
@@ -117,35 +115,20 @@ fn parseDirective(tokens: *types.TokenIterator) union(enum) {
     }
 
     if (std.mem.eql(u8, name.?.value, "import")) {
-        const path = tokens.expect(.String);
-        if (path == null) {
-            return .{
-                .err = .{
-                    .token = tokens.tokens[tokens.index - 1],
-                    .message = "expected library or file in import directive",
-                    .code = 1,
-                },
-            };
-        }
-
-        node = .{
-            .Import = .{
-                .kind = .Builtin,
-                .path = path.?.value,
-            },
-        };
+        const import = parseImport(tokens);
+        if (import == .err) return .{ .err = import.err };
+        node = import.ok;
     } else {
         return .{
             .err = .{
-                .token = tokens.tokens[tokens.index - 1],
+                .token = name.?.*,
                 .message = "unkown directive",
                 .code = 1,
             },
         };
     }
 
-    token = tokens.expect(.RBracket);
-    if (token == null) {
+    if (tokens.expect(.RBracket) == null) {
         return .{
             .err = .{
                 .token = tokens.tokens[tokens.index - 1],
@@ -158,9 +141,31 @@ fn parseDirective(tokens: *types.TokenIterator) union(enum) {
     return .{ .ok = node };
 }
 
-fn isAssign(kind: types.TokKind) bool {
-    return switch (kind) {
-        .ColonEqual, .HashEqual, .Equals => true,
-        else => false,
+fn parseImport(tokens: *types.TokenIterator) types.ParserReturn {
+    var kind: types.ImportKind = .Builtin;
+    const path = tokens.expect(.String);
+    if (path == null) {
+        return .{
+            .err = .{
+                .token = tokens.tokens[tokens.index - 1],
+                .message = "expected library or file in import directive",
+                .code = 1,
+            },
+        };
+    } else {
+        if (std.mem.startsWith(u8, path.?.value, "/")) {
+            kind = .Absolute;
+        } else if (std.mem.startsWith(u8, path.?.value, "./")) {
+            kind = .Relative;
+        }
+    }
+
+    return .{
+        .ok = .{
+            .Import = .{
+                .kind = kind,
+                .path = path.?.value,
+            },
+        },
     };
 }
