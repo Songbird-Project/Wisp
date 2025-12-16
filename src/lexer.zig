@@ -8,22 +8,16 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
 
     for (src, 0..) |line, line_num| {
         var col: usize = 0;
+        if (std.mem.startsWith(u8, line, "//") or line.len == 0) continue;
 
         while (col < line.len) : (col += 1) {
             const char = line[col];
             var token: types.Token = .{};
 
-            if (std.ascii.isWhitespace(char) and char != '\n') continue;
+            if (std.ascii.isWhitespace(char)) continue;
             if (std.mem.startsWith(u8, line[col..], "//")) break;
 
-            if (char == '\n') {
-                token = .{
-                    .kind = .Newline,
-                    .line_num = line_num,
-                    .line_col = col,
-                    .line_col_end = col,
-                };
-            } else if (std.ascii.isAlphabetic(char) or char == '_') {
+            if (std.ascii.isAlphabetic(char) or char == '_') {
                 const start = col;
                 while (col < line.len and
                     (std.ascii.isAlphanumeric(line[col]) or line[col] == '_')) : (col += 1)
@@ -186,6 +180,14 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
 
             try token_list.append(alloc, token);
         }
+
+        const newline: types.Token = .{
+            .kind = .Newline,
+            .line_num = line_num,
+            .line_col = line.len,
+            .line_col_end = line.len,
+        };
+        try token_list.append(alloc, newline);
     }
 
     return .{
