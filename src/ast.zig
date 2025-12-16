@@ -195,7 +195,7 @@ fn parseExit(tokens: *types.TokenIterator) types.ParserReturn {
     var immediate_exit: bool = true;
     var exit_value: ?*types.ASTNode = null;
 
-    const arrow = tokens.peek(1);
+    const arrow = tokens.peek(0);
     if (arrow != null and arrow.?.kind != .Newline) {
         _ = tokens.next();
 
@@ -212,21 +212,37 @@ fn parseExit(tokens: *types.TokenIterator) types.ParserReturn {
         }
 
         const value = tokens.next();
-        if (value == null or (value.?.kind != .Number and value.?.number_kind.? != .DecimalInt)) {
+        if (value == null or value.?.kind != .Id and value.?.kind != .Number) {
             return .{
                 .err = .{
-                    .token = arrow.?.*,
-                    .message = "expected value for exit",
+                    .token = if (value != null) value.?.* else arrow.?.*,
+                    .message = "invalid value for exit",
                     .code = 1,
                 },
             };
         }
 
-        var value_node: types.ASTNode = .{
-            .Number = .{
-                .kind = numbers.NumberKind.DecimalInt,
-                .value = value.?.value,
+        if (value.?.kind == .Number and value.?.number_kind.? != .DecimalInt) {
+            return .{
+                .err = .{
+                    .token = value.?.*,
+                    .message = "exit value for exit should be an integer, identifier or error",
+                    .code = 1,
+                },
+            };
+        }
+
+        var value_node: types.ASTNode = switch (value.?.kind) {
+            .Number => .{
+                .Number = .{
+                    .kind = numbers.NumberKind.DecimalInt,
+                    .value = value.?.value,
+                },
             },
+            .Id => .{
+                .Identifier = value.?.value,
+            },
+            else => unreachable,
         };
 
         exit_value = &value_node;
