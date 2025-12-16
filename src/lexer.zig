@@ -27,7 +27,7 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
                     .kind = .Word,
                     .value = line[start .. col + 1],
                     .line_num = line_num,
-                    .line_col = start + 1,
+                    .line_col = start,
                     .line_col_end = col,
                 };
             } else if (std.ascii.isDigit(char)) {
@@ -36,16 +36,6 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
                 const start = col;
                 while (col < line.len) : (col += 1) {
                     if (std.ascii.isWhitespace(line[col])) break;
-                    switch (line[col]) {
-                        '+', '-', '*', '/', '%', '&', '|', '^', '<', '>', '!', '}', ']', ')' => break,
-                        '.' => if (col + 1 < line.len) {
-                            switch (line[col + 1]) {
-                                '&', '|', '^', '<', '>', '!' => break,
-                                else => {},
-                            }
-                        },
-                        else => {},
-                    }
 
                     if (col == start + 1 and line[start] == '0') {
                         switch (line[col]) {
@@ -101,7 +91,7 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
                     .number_kind = kind,
                     .value = line[start .. col + 1],
                     .line_num = line_num,
-                    .line_col = start + 1,
+                    .line_col = start,
                     .line_col_end = col,
                 };
             } else if (isQuote(char)) {
@@ -144,7 +134,7 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
                     .kind = .String,
                     .value = line[start + 1 .. col],
                     .line_num = line_num,
-                    .line_col = start + 1,
+                    .line_col = start,
                     .line_col_end = col,
                 };
             } else {
@@ -172,7 +162,7 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
                     .kind = op.ok.kind,
                     .value = line[start .. col + 1],
                     .line_num = line_num,
-                    .line_col = start + 1,
+                    .line_col = start,
                     .line_col_end = col,
                 };
             }
