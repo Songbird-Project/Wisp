@@ -6,6 +6,12 @@ pub const Param = struct {
     type: *ASTNode,
 };
 
+pub const ImportKind = enum {
+    Relative,
+    Absolute,
+    Builtin,
+};
+
 pub const ASTNode = union(enum) {
     Conditional: struct {
         kind: ASTKind,
@@ -49,7 +55,7 @@ pub const ASTNode = union(enum) {
 
     Exit: struct {
         immediate: bool,
-        text: ?*ASTNode,
+        value: ?*ASTNode,
     },
 
     ReturnSig: struct {
@@ -59,10 +65,20 @@ pub const ASTNode = union(enum) {
     },
 
     Import: struct {
-        is_relative: bool,
-        is_absolute: bool,
-        is_builtin: bool,
+        kind: ImportKind,
         path: []const u8,
+    },
+
+    Assign: struct {
+        immutable: bool,
+        name: []const u8,
+        type: ?[]const u8,
+        value: []const u8,
+    },
+
+    Type: struct {
+        name: []const u8,
+        type: []const u8,
     },
 
     Return: ?*ASTNode,
@@ -142,7 +158,7 @@ pub const AST = struct {
 };
 
 pub const Token = struct {
-    kind: TokKind = .EOF,
+    kind: TokKind = .Id,
     number_kind: ?numbers.NumberKind = null,
     value: []const u8 = "",
     line_num: usize = 0,
@@ -206,7 +222,7 @@ pub const Token = struct {
             .ColonEqual => ":=",
             .HashEqual => "#=",
             .String => "String",
-            .Word => "Word",
+            .Id => "Identifier",
             .Number => {
                 if (self.number_kind) |kind| {
                     return switch (kind) {
@@ -221,7 +237,7 @@ pub const Token = struct {
                     return "Number";
                 }
             },
-            else => "\u{FFFD}",
+            // else => "\u{FFFD}",
         };
     }
 };
@@ -294,8 +310,7 @@ pub const TokKind = enum {
     HashEqual, // #=
 
     //====== Other ======//
-    EOF, // End of file
-    Word, // `a-zA-Z`
+    Id, // `a-zA-Z`
     Number, // numbers.NumberKind
     String, // "..."
 
@@ -351,5 +366,14 @@ pub const TokenIterator = struct {
     pub fn peek(self: *TokenIterator, distance: usize) ?*Token {
         if (self.index + distance >= self.tokens.len) return null;
         return &self.tokens[self.index + distance];
+    }
+
+    pub fn expect(self: *TokenIterator, kind: TokKind) ?*Token {
+        const token = self.next();
+        if (token == null or token.?.kind != kind) {
+            return null;
+        }
+
+        return token;
     }
 };
