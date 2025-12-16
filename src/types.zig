@@ -1,6 +1,15 @@
 const std = @import("std");
 const numbers = @import("numbers.zig");
 
+pub const ParserReturn = union(enum) {
+    ok: ASTNode,
+    err: struct {
+        token: Token,
+        message: []const u8,
+        code: u8,
+    },
+};
+
 pub const Param = struct {
     name: []const u8,
     type: *ASTNode,
