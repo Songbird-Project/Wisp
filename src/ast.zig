@@ -7,31 +7,11 @@ pub fn parse(alloc: std.mem.Allocator, filename: []const u8, src: [][]u8, tokens
     var nodes: std.ArrayList(types.ASTNode) = .empty;
 
     while (tokens.peek(0)) |token| {
-        var node: ?types.ASTNode = null;
+        var node: ?types.ParserReturn = null;
 
         switch (token.kind) {
             .Hash => {
-                const directiveNode = parseDirective(tokens);
-                if (directiveNode == .err) {
-                    const err = directiveNode.err;
-                    return .{
-                        .err = .{
-                            .message = try errors.format(
-                                alloc,
-                                err.message,
-                                filename,
-                                src[err.token.line_num],
-                                null,
-                                err.token.line_num,
-                                err.token.line_col,
-                                err.token.line_col_end,
-                            ),
-                            .code = err.code,
-                        },
-                    };
-                }
-
-                node = directiveNode.ok;
+                node = parseDirective(tokens);
             },
             .Fn => {
                 // TODO: parseFn
@@ -40,7 +20,7 @@ pub fn parse(alloc: std.mem.Allocator, filename: []const u8, src: [][]u8, tokens
                 // TODO: parseReturn
             },
             .Exit => {
-                // TODO: parseExit
+                node = parseExit(tokens);
             },
             .Id => {
                 const id = tokens.peek(1) orelse break;
@@ -78,7 +58,46 @@ pub fn parse(alloc: std.mem.Allocator, filename: []const u8, src: [][]u8, tokens
             };
         }
 
-        try nodes.append(alloc, node.?);
+        if (node.? == .err) {
+            const err = node.?.err;
+            return .{
+                .err = .{
+                    .message = try errors.format(
+                        alloc,
+                        err.message,
+                        filename,
+                        src[err.token.line_num],
+                        null,
+                        err.token.line_num,
+                        err.token.line_col,
+                        err.token.line_col_end,
+                    ),
+                    .code = err.code,
+                },
+            };
+        }
+
+        if (tokens.expect(.Newline) == null) {
+            const newline = tokens.tokens[tokens.index - 2];
+
+            return .{
+                .err = .{
+                    .message = try errors.format(
+                        alloc,
+                        "expected newline after statement",
+                        filename,
+                        src[newline.line_num],
+                        null,
+                        newline.line_num,
+                        newline.line_col + 1,
+                        newline.line_col_end + 1,
+                    ),
+                    .code = 1,
+                },
+            };
+        }
+
+        try nodes.append(alloc, node.?.ok);
     }
 
     return .{
@@ -107,7 +126,7 @@ fn parseDirective(tokens: *types.TokenIterator) types.ParserReturn {
     if (tokens.expect(.LBracket) == null) {
         return .{
             .err = .{
-                .token = tokens.tokens[tokens.index - 1],
+                .token = name.?.*,
                 .message = "expected arguments after directive name",
                 .code = 1,
             },
@@ -165,6 +184,57 @@ fn parseImport(tokens: *types.TokenIterator) types.ParserReturn {
             .Import = .{
                 .kind = kind,
                 .path = path.?.value,
+            },
+        },
+    };
+}
+
+fn parseExit(tokens: *types.TokenIterator) types.ParserReturn {
+    _ = tokens.next();
+
+    var immediate_exit: bool = true;
+    var exit_value: ?*types.ASTNode = null;
+
+    const arrow = tokens.next();
+    if (arrow != null) {
+        switch (arrow.?.kind) {
+            .LErrorArrow => immediate_exit = true,
+            .LArrow => immediate_exit = false,
+            else => return .{
+                .err = .{
+                    .token = arrow.?.*,
+                    .message = "invalid arrow after exit keyword",
+                    .code = 1,
+                },
+            },
+        }
+
+        const value = tokens.next();
+        if (value == null or (value.?.kind != .Number and value.?.number_kind.? != .DecimalInt)) {
+            return .{
+                .err = .{
+                    .token = arrow.?.*,
+                    .message = "expected value for exit",
+                    .code = 1,
+                },
+            };
+        }
+
+        var value_node: types.ASTNode = .{
+            .Number = .{
+                .kind = numbers.NumberKind.DecimalInt,
+                .value = value.?.value,
+            },
+        };
+
+        exit_value = &value_node;
+    }
+
+    return .{
+        .ok = .{
+            .Exit = .{
+                .immediate = immediate_exit,
+                .value = exit_value,
             },
         },
     };
