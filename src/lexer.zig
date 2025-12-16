@@ -13,10 +13,17 @@ pub fn lex(alloc: std.mem.Allocator, filename: [:0]const u8, src: [][]u8) !error
             const char = line[col];
             var token: types.Token = .{};
 
-            if (std.ascii.isWhitespace(char)) continue;
+            if (std.ascii.isWhitespace(char) and char != '\n') continue;
             if (std.mem.startsWith(u8, line[col..], "//")) break;
 
-            if (std.ascii.isAlphabetic(char) or char == '_') {
+            if (char == '\n') {
+                token = .{
+                    .kind = .Newline,
+                    .line_num = line_num,
+                    .line_col = col,
+                    .line_col_end = col,
+                };
+            } else if (std.ascii.isAlphabetic(char) or char == '_') {
                 const start = col;
                 while (col < line.len and
                     (std.ascii.isAlphanumeric(line[col]) or line[col] == '_')) : (col += 1)

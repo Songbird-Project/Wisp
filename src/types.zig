@@ -59,7 +59,7 @@ pub const ASTNode = union(enum) {
 
     Number: struct {
         kind: numbers.NumberKind,
-        text: []const u8,
+        value: []const u8,
     },
 
     Exit: struct {
@@ -88,6 +88,11 @@ pub const ASTNode = union(enum) {
     Type: struct {
         name: []const u8,
         type: []const u8,
+    },
+
+    Error: struct {
+        message: ?[]const u8,
+        code: ?[]const u8,
     },
 
     Return: ?*ASTNode,
@@ -235,6 +240,7 @@ pub const Token = struct {
             .Exit => "Keyword Exit",
             .Return => "Keyword Return",
             .Fn => "Keyword Function",
+            .Error => "Keyword Error",
             .Number => {
                 if (self.number_kind) |kind| {
                     return switch (kind) {
@@ -249,6 +255,7 @@ pub const Token = struct {
                     return "Number";
                 }
             },
+            .Newline => "Newline",
             // else => "\u{FFFD}",
         };
     }
@@ -323,11 +330,13 @@ pub const TokKind = enum {
     Exit, // exit
     Return, // return
     Fn, // fn
+    Error, // error
 
     //====== Other ======//
     Id, // `a-zA-Z`
-    Number, // numbers.NumberKind
+    Number, // [Int|Float][Decimal|Hex|Binary]
     String, // "..."
+    Newline, // \n
 
     pub fn charToKind(char: u8) ?TokKind {
         return switch (char) {
