@@ -41,21 +41,7 @@ pub fn parse(alloc: std.mem.Allocator, filename: []const u8, src: [][]u8, tokens
         }
 
         if (node == null) {
-            return .{
-                .err = .{
-                    .message = try errors.format(
-                        alloc,
-                        "unexpected token in top level of file",
-                        filename,
-                        src[token.line_num],
-                        token.kindToChar(),
-                        token.line_num,
-                        token.line_col,
-                        token.line_col_end,
-                    ),
-                    .code = 1,
-                },
-            };
+            node = parseExpr(tokens, 0);
         }
 
         if (node.? == .err) {
@@ -107,9 +93,140 @@ pub fn parse(alloc: std.mem.Allocator, filename: []const u8, src: [][]u8, tokens
     };
 }
 
+fn parseExpr(tokens: *types.TokenIterator, min_bp: u8) types.ParserReturn {
+    const lhs_tok = tokens.next().?;
+    var lhs: types.ASTNode = .Nil;
+    var rhs: types.ASTNode = .Nil;
+
+    if (prefixBP(lhs_tok.kind)) |bp| {
+        const expr = parseExpr(tokens, bp);
+        if (expr == .err) return .{ .err = expr.err };
+        rhs = expr.ok;
+        const kind: types.ASTKind = switch (lhs_tok.kind) {
+            .Dash => .Negate,
+            .Bang => .Not,
+            .BNot => .BNot,
+            .PlusPlus => .Increment,
+            .DashDash => .Decrement,
+            .ColonColon => .TypeOf,
+            else => unreachable,
+        };
+
+        lhs = .{
+            .PrefixOp = .{
+                .kind = kind,
+                .value = &rhs,
+            },
+        };
+    } else if (isAtom(lhs_tok.kind)) {
+        lhs = switch (lhs_tok.kind) {
+            .String => .{ .String = lhs_tok.value },
+            .Id => .{ .Identifier = lhs_tok.value },
+            .Number => .{
+                .Number = .{
+                    .kind = lhs_tok.number_kind.?,
+                    .value = lhs_tok.value,
+                },
+            },
+            else => unreachable,
+        };
+    } else if (lhs_tok.kind == .LBracket) {
+        const expr = parseExpr(tokens, 0);
+        if (expr == .err) return .{ .err = expr.err };
+        lhs = expr.ok;
+        if (tokens.expect(.RBracket) == null) {
+            return .{
+                .err = .{
+                    .token = lhs_tok.*,
+                    .message = "expected closing bracket",
+                    .code = 1,
+                },
+            };
+        }
+    } else {
+        return .{
+            .err = .{
+                .token = lhs_tok.*,
+                .message = "unexpected token in top level of file",
+                .code = 1,
+            },
+        };
+    }
+
+    while (tokens.peek(0)) |next_tok| {
+        if (postfixBP(next_tok.kind)) |bp| {
+            if (bp < min_bp) break;
+            _ = tokens.next();
+
+            const kind: types.ASTKind = switch (next_tok.kind) {
+                .PlusPlus => .Increment,
+                .DashDash => .Decrement,
+                else => unreachable,
+            };
+
+            lhs = .{
+                .PostfixOp = .{
+                    .kind = kind,
+                    .value = &lhs,
+                },
+            };
+
+            continue;
+        }
+
+        if (infixBP(next_tok.kind)) |bps| {
+            if (bps.left < min_bp) break;
+
+            _ = tokens.next();
+            const expr = parseExpr(tokens, bps.right);
+            if (expr == .err) {
+                return .{ .err = expr.err };
+            }
+            rhs = expr.ok;
+            const kind: types.ASTKind = switch (next_tok.kind) {
+                .Equals => .Reassign,
+                .ColonEqual => .AssignVar,
+                .HashEqual => .AssignConst,
+                .And => .And,
+                .Pipe => .Or,
+                .LAngle => .Lesser,
+                .RAngle => .Greater,
+                .LessOrEqual => .LesserOrEqual,
+                .GreaterOrEqual => .GreaterOrEqual,
+                .EqualEqual => .Equal,
+                .BangEqual => .NotEqual,
+                .Plus => .Add,
+                .Dash => .Sub,
+                .Star => .Mul,
+                .FSlash => .Div,
+                .Percent => .Mod,
+                .Caret => .Pow,
+                .BAnd => .BAnd,
+                .BXor => .BXor,
+                .BOr => .BOr,
+                .ColonColon => .Type,
+                else => unreachable,
+            };
+
+            lhs = .{
+                .BinaryOp = .{
+                    .kind = kind,
+                    .lhs = &lhs,
+                    .rhs = &rhs,
+                },
+            };
+
+            continue;
+        }
+
+        break;
+    }
+
+    return .{ .ok = lhs };
+}
+
 fn parseDirective(tokens: *types.TokenIterator) types.ParserReturn {
     var node: types.ASTNode = undefined;
-
     const hash = tokens.next().?;
 
     const name: ?*types.Token = tokens.expect(.Id);
@@ -161,8 +278,7 @@ fn parseDirective(tokens: *types.TokenIterator) types.ParserReturn {
 }
 
 fn parseImport(tokens: *types.TokenIterator) types.ParserReturn {
-    var kind: types.ImportKind = .Builtin;
-    const path = tokens.expect(.String);
+    const path = tokens.next();
     if (path == null) {
         return .{
             .err = .{
@@ -171,21 +287,10 @@ fn parseImport(tokens: *types.TokenIterator) types.ParserReturn {
                 .code = 1,
             },
         };
-    } else {
-        if (std.mem.startsWith(u8, path.?.value, "/")) {
-            kind = .Absolute;
-        } else if (std.mem.startsWith(u8, path.?.value, "./")) {
-            kind = .Relative;
-        }
     }
 
     return .{
-        .ok = .{
-            .Import = .{
-                .kind = kind,
-                .path = path.?.value,
-            },
-        },
+        .ok = .{ .Import = path.?.value },
     };
 }
 
@@ -212,21 +317,11 @@ fn parseExit(tokens: *types.TokenIterator) types.ParserReturn {
         }
 
         const value = tokens.next();
-        if (value == null or value.?.kind != .Id and value.?.kind != .Number) {
+        if (value == null) {
             return .{
                 .err = .{
                     .token = if (value != null) value.?.* else arrow.?.*,
-                    .message = "invalid value for exit",
-                    .code = 1,
-                },
-            };
-        }
-
-        if (value.?.kind == .Number and value.?.number_kind.? != .DecimalInt) {
-            return .{
-                .err = .{
-                    .token = value.?.*,
-                    .message = "exit value for exit should be an integer, identifier or error",
+                    .message = "expected value after arrow",
                     .code = 1,
                 },
             };
@@ -255,5 +350,46 @@ fn parseExit(tokens: *types.TokenIterator) types.ParserReturn {
                 .value = exit_value,
             },
         },
+    };
+}
+
+fn infixBP(kind: types.TokKind) ?struct { left: u8, right: u8 } {
+    return switch (kind) {
+        .Equals, .ColonEqual, .HashEqual => .{ .left = 1, .right = 2 },
+        .And => .{ .left = 3, .right = 4 },
+        .Pipe => .{ .left = 2, .right = 3 },
+        .LAngle, .RAngle, .LessOrEqual, .GreaterOrEqual, .EqualEqual, .BangEqual => .{ .left = 5, .right = 6 },
+        .Plus, .Dash => .{ .left = 7, .right = 8 },
+        .Star, .FSlash, .Percent => .{ .left = 9, .right = 10 },
+        .Caret => .{ .left = 11, .right = 12 },
+        .BAnd => .{ .left = 13, .right = 14 },
+        .BXor => .{ .left = 12, .right = 13 },
+        .BOr => .{ .left = 11, .right = 12 },
+        .ColonColon => .{ .left = 1, .right = 2 },
+
+        else => null,
+    };
+}
+
+fn prefixBP(kind: types.TokKind) ?u8 {
+    return switch (kind) {
+        .ColonColon => 14,
+        .Dash, .Bang, .BNot => 15,
+        .PlusPlus, .DashDash => 16,
+        else => null,
+    };
+}
+
+fn postfixBP(kind: types.TokKind) ?u8 {
+    return switch (kind) {
+        .PlusPlus, .DashDash => 17,
+        else => null,
+    };
+}
+
+fn isAtom(kind: types.TokKind) bool {
+    return switch (kind) {
+        .String, .Number, .Id => true,
+        else => false,
     };
 }
