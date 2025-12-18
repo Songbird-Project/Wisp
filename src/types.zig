@@ -67,7 +67,7 @@ pub const ASTNode = union(enum) {
         return_type: *ASTNode,
     },
 
-    Import: []const u8,
+    Import: *ASTNode,
 
     Assign: struct {
         immutable: bool,
