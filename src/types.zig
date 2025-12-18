@@ -15,12 +15,6 @@ pub const Param = struct {
     type: *ASTNode,
 };
 
-pub const ImportKind = enum {
-    Relative,
-    Absolute,
-    Builtin,
-};
-
 pub const ASTNode = union(enum) {
     Conditional: struct {
         kind: ASTKind,
@@ -37,12 +31,12 @@ pub const ASTNode = union(enum) {
 
     PrefixOp: struct {
         kind: ASTKind,
-        lhs: *ASTNode,
+        value: *ASTNode,
     },
 
     PostfixOp: struct {
         kind: ASTKind,
-        lhs: *ASTNode,
+        value: *ASTNode,
     },
 
     Function: struct {
@@ -73,21 +67,13 @@ pub const ASTNode = union(enum) {
         return_type: *ASTNode,
     },
 
-    Import: struct {
-        kind: ImportKind,
-        path: []const u8,
-    },
+    Import: []const u8,
 
     Assign: struct {
         immutable: bool,
         name: []const u8,
         type: ?[]const u8,
         value: []const u8,
-    },
-
-    Type: struct {
-        name: []const u8,
-        type: []const u8,
     },
 
     Error: struct {
@@ -140,13 +126,13 @@ pub const ASTKind = enum {
     Reassign, // LHS = RHS
     AssignVar, // LHS := RHS
     AssignConst, // LHS #= RHS
-    TypeCast, // LHS :: RHS
+    Type, // LHS::RHS
 
     //====== Prefix Operators ======//
     Not, // !LHS
     Negate, // -LHS
-    TypeOf, // ::LHS
     BNot, // .!LHS
+    TypeOf, // ::LHS
 
     //====== Postfix Operators ======//
     Increment, // LHS++
